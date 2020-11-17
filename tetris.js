@@ -23,6 +23,12 @@ var counterclock = false;
 var rotating = false;
 var falling = false;
 
+//Enumerate
+const TileType = {NONE: -1, I: 0, J: 1, L: 2, O: 3, S: 4, T: 5, Z: 6, GARBAGE: 7};
+
+const Rotation = {NONE: -1, CLOCKWISE: 90, COUNTERCLOCKWISE: -90};
+const Motion = {NONE: -1, LEFT: 0, RIGHT: 1};
+
 function setupWebGL() {
 
     // Get the canvas and context
@@ -31,24 +37,23 @@ function setupWebGL() {
     gl.viewportWidth = canvas.width;
     gl.viewportHeight = canvas.height;
     try {
-      if (gl == null) {
-        throw "unable to create gl context -- is your browser gl ready?";
-      } else {
-        gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
-        gl.clearDepth(1.0); // use max when we clear the depth buffer
-        gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
-      }
+        if (gl == null) {
+            throw "unable to create gl context -- is your browser gl ready?";
+        } else {
+            gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
+            gl.clearDepth(1.0); // use max when we clear the depth buffer
+            gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
+        }
     } // end try
-    
-    catch(e) {
-      console.log(e);
+
+    catch (e) {
+        console.log(e);
     } // end catch
- 
+
 } // end setupWebGL
 
-function shaders()
-{
-	// define vertex shader in essl using es6 template strings
+function shaders() {
+    // define vertex shader in essl using es6 template strings
     var vShaderCode = `
         attribute vec3 aVertexPosition; // vertex position
         attribute vec3 aVertexNormal; // vertex normal
@@ -70,7 +75,7 @@ function shaders()
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
         }
     `;
-    
+
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
         precision mediump float; // set float to medium precision
@@ -115,23 +120,23 @@ function shaders()
             gl_FragColor = vec4(colorOut, 1.0); 
         }
     `;
-	
-	try {
+
+    try {
         // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
-        gl.shaderSource(fShader,fShaderCode); // attach code to shader
+        gl.shaderSource(fShader, fShaderCode); // attach code to shader
         gl.compileShader(fShader); // compile the code for gpu execution
 
         // console.log("vertex shader: "+vShaderCode);
         var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
-        gl.shaderSource(vShader,vShaderCode); // attach code to shader
+        gl.shaderSource(vShader, vShaderCode); // attach code to shader
         gl.compileShader(vShader); // compile the code for gpu execution
-            
+
         if (!gl.getShaderParameter(fShader, gl.COMPILE_STATUS)) { // bad frag shader compile
-            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);  
+            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);
             gl.deleteShader(fShader);
         } else if (!gl.getShaderParameter(vShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);  
+            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);
             gl.deleteShader(vShader);
         } else { // no compile errors
             var shaderProgram = gl.createProgram(); // create the single shader program
@@ -142,698 +147,969 @@ function shaders()
             if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
             } else { // no shader program link errors
-				gl.useProgram(shaderProgram);
-				shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-				gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-				//shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
-				//gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
-	
-				shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-				shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-			}
-		}
-	}
-	catch(e){
-		console.log(e);
-	}
-	
+                gl.useProgram(shaderProgram);
+                shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+                gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+                //shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+                //gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+
+                shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+                shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+            }
+        }
+    } catch (e) {
+        console.log(e);
+    }
+
 }
 
-function gameGrid()
-{
-	this.game = new Array(16);
-	for(var i = 0; i < this.game.length; i++)
-	{
-		this.game[i] = new Array(10);
-		for(var j = 0; j < this.game[i].length; j++)
-		{
-			this.game[i][j] = [r2, g2, b2, 1.0, false];
-		}
-	}
-	this.set = function(i, j, block)
-	{
-		this.game[i][j] = block;
-	}
-	
-	this.setPlace = function(i, j, taken)
-	{
-		this.game[i][j][4] = taken;
-	}
-	
-	this.get = function(i, j, blocks)
-	{
-		return this.game[x][y][blocks];
-	}
+// get the JSON file from the passed URL
+function getJSONFile(url, descr) {
+    try {
+        if ((typeof (url) !== "string") || (typeof (descr) !== "string"))
+            throw "getJSONFile: parameter not a string";
+        else {
+            var httpReq = new XMLHttpRequest(); // a new http request
+            httpReq.open("GET", url, false); // init the request
+            httpReq.send(null); // send the request
+            var startTime = Date.now();
+            while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
+                if ((Date.now() - startTime) > 3000)
+                    break;
+            } // until its loaded or we time out after three seconds
+            if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE))
+                throw "Unable to open " + descr + " file!";
+            else
+                return JSON.parse(httpReq.response);
+        } // end if good params
+    } // end try
+
+    catch (e) {
+        console.log(e);
+        return (String.null);
+    }
+} // end get input json file
+
+// does stuff whe
+
+
+class gameGrid {
+
+    #tiles_ = [];
+    #linesToClear_ = [];
+    #tilesAfterClear_ = [];
+    #tile_;
+    #nRows_;
+    #nCols_;
+    #ghostRow_; //Ghost is a predictor on how tile will be looks like
+
+    constructor(row, col) {
+        this.#nRows_ = row;
+        this.#nCols_ = col;
+    }
+
+    /**Clear the board
+     *
+     */
+    clear() {
+
+    }
+
+    // TileColor tileAt(int row, int col) const { return tiles_[(row + kRowsAbove_) * nCols + col]; };
+    /**
+     * Tile at
+     * @param row
+     * @param col
+     */
+    tileAt(row, col) {
+
+    }
+
+    /**
+     *
+     */
+    frozeTile() {
+    }
+
+    /**
+     *
+     * @param TypeOfTile
+     */
+    generateTile(TypeOfTile) {
+    }
+
+    /**
+     *
+     * @param dCol
+     */
+    moveHorizontal(dCol) {
+    }
+
+    /**
+     *
+     * @param dRow
+     */
+    moveVertical(dRow) {
+    }
+
+    /**
+     *
+     * @param rotation Rotation degree default is 90
+     * @param direct Clockwise > 0, CounterClockwise < 0
+     */
+    rotate(rotation, direct) {
+
+    }
+
+    /**
+     *
+     */
+    hardDrop() {
+
+    }
+
+    /**
+     *
+     */
+    isOnGround() {
+
+    }
+
+    /**
+     *
+     * @returns {((chunk: any) => 1) | number | ((chunk: ArrayBufferView) => number) | GLint | string | QueuingStrategySizeCallback<T>}
+     */
+    const
+    numLinesToClear = () => this.#linesToClear_.size;
+
+    /**
+     *
+     */
+    clearLines() {
+    }
+
+    /**
+     *
+     * @returns {{}}
+     */
+    const
+    LinesToClear = () => this.#linesToClear_;
+
+    /**
+     *
+     * @returns {*}
+     */
+    const
+    Tile = () => this.#tile_;
+
+    /**
+     *
+     * @returns {*}
+     */
+    const
+    tileCol = () => this.#nCols_;
+
+    /**
+     *
+     * @returns {*}
+     */
+    const
+    ghostRow = () => this.#ghostRow_;
+
+//Private method
+    /**
+     *
+     * @param row
+     * @param col
+     * @param tileColor
+     */
+    setTileOnBoard(row, col, tileColor) {
+
+    }
+
+    /**
+     *
+     * @param row
+     * @param col
+     */
+    isTileFilled(row, col) {
+
+    }
+
+    /**
+     *
+     * @param row
+     * @param col
+     * @param tile
+     */
+    checkPosition(row, col, tile) {
+
+    }
+
+    /**
+     *
+     */
+    updateGhostRow() {
+    }
+
+    /**
+     *
+     */
+    findLInesToClear() {
+
+    }
+
 }
 
-function twoByTwo()
-{
-	this.pos = [0 ,4, 0, 5, 1, 4, 1, 5];
-	
-	this.color = [];
-	
-	this.setColor = function(color)
-	{
-		this.color = color;
-	}
-	
-	this.object = function()
-	{
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], true);
-			i++;
-		}
-	}
-	
-	this.checkBottom = function()
-	{
-		var taken = false;
-		if( grid.get((this.pos[4] + 1), this.pos[5], 4) || grid.get((this.pos[6] + 1), this.pos[7], 4))
-		{
-			taken = true;
-		}
-		return taken;
-		
-	}
-	
-	this.objectGravity = function()
-	{
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], false);
-			i++;
-		}
-		
-		for(var i = 0; i < 8; i++)
-		{
-			oldPlace = this.pos[i];
-			this.pos[i] = oldPlace + 1;
-			grid.setPlace(this.pos[i], this.pos[i + 1], true);
-			i++;
-		}
-	}
-	
-	this.checkLeft = function()
-	{
-		var taken = null;
-		var position;
-		var left = this.pos[1];
-		var right = this.pos[7];
-		
-		if(left == 0 || right == 0)
-		{
-			taken = true;
-			return taken;
-		}
-		
-		if(left < right)
-		{
-			position = this.pos[1] - 1;
-		}
-		if(right < left)
-		{
-			position = this.pos[7] - 1;
-		}
-		
-		if(position >= 0)
-		{
-			var a = grid.get(this.pos[0], position, 4);
-			var b = grid.get(this.pos[4], position, 4);
-			if(!a && !b)
-			{
-				taken = false;
-				
-			}
-			else 
-			{
-				taken = true;
-			}
-		}
-		return taken;
-	}
-	
-	this.checkRight = function()
-	{
-		var taken = null;
-		var position;
-		var left = this.pos[1];
-		var right = this.pos[7];
-		
-		if(left == 9 || right == 9)
-		{
-			taken = true;
-			return taken;
-		}
-		
-		if(left > right)
-		{
-			position = this.pos[1] + 1;
-		}
-		if(right > left)
-		{
-			position = this.pos[7] + 1;
-		}
-		
-		if(position <= 9)
-		{
-			var a = grid.get(this.pos[0], position, 4);
-			var b = grid.get(this.pos[4], position, 4);
-			if(!a && !b)
-			{
-				taken = false;
-				
-			}
-			else 
-			{
-				taken = true;
-			}
-		}
-		return taken;
-	}
-	
-	this.moveLeft = function()
-	{
-		if(!this.checkLeft())
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i], this.pos[i + 1], false);
-				i++;
-			}
-			for(var i = 0; i < 8; i++)
-			{
-				--this.pos[i + 1];
-				grid.setPlace(this.pos[i], this.pos[i + 1], true);
-				i++;
-			}
-			posX -= 1;
-		}
-	}
-	
-	this.moveRight = function()
-	{
-		if(!this.checkRight())
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i], this.pos[i + 1], false);
-				i++;
-			}
-			for(var i = 0; i < 8; i++)
-			{
-				++this.pos[i + 1];
-				grid.setPlace(this.pos[i], this.pos[i + 1], true);
-				i++;
-			}
-			posX += 1;
-		}
-	}
-	
-	this.drop = function()
-	{
-		falling = true;
-		
-		var taken = false;
-		var row = this.pos[4];
-		var stop = row;
-		var rowsLeft = 14 - row;
-		for(var i = 1; rowsLeft >= 0 && !taken; --rowsLeft)
-		{
-			taken = grid.get((this.pos[4] + i), this.pos[5], 4);
-			if(taken)
-			{
-				stop = this.pos[4] + i - 1;
-			} else
-			{
-				taken = grid.get((this.pos[6] + i), this.pos[7], 4);
-				if(taken)
-				{
-					stop = this.pos[4] + i - 1;
-				}
-			}
-			i++;
-		}
-		
-		var rowsFallen = stop - row;
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], false);
-			i++;
-		}
-		
-		this.pos[0] = stop - 1;
-		this.pos[2] = stop - 1;
-		this.pos[4] = stop;
-		this.pos[6] = stop;
-		
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], true);
-			i++;
-		}
-		posY -= rowsFallen;
-		falling = false;
-	}
+class Tetris {
+    static #linesToClearPerLevel_;
+    static #maxLevel_;
+    static #moveDelay_;
+    static #moveRepeatDelay_;
+    static #softDropSpeedFactor_;
+    static #lockDownTimeLimit_;
+    static #lockDownMovesLimit_;
+    static #pauseAfterLineClear_;
+
+    #gameGrid;
+
+    //Flag for GG
+    #gameOver_;
+
+    #timePrecision_;
+
+    // std::default_random_engine rng_;
+    #randomSeed_;
+    #bag_;
+    #nextTile_;
+    #tileOnHold_;
+    #canHold_;
+
+    #level_;
+    #linesCleared_;
+    #score_;
+
+    #secondsPerLine_;
+    #moveDownTimer_;
+
+    #motion_;
+    #moveLeftPrev_;
+    #moveRightPrev_;
+    #moveRepeatDelayTimer_;
+    #moveRepeatTimer_;
+
+    #isOnGround_;
+    #lockingTimer_;
+    #nMovesWhileLocking_; //Number for locking tiles for moving
+
+    #pausedForLinesClear_;
+    #linesClearTimer_;
+
+    constructor(gameGrid, timePrecision, randomSeed) {
+        this.#gameGrid = gameGrid;
+        this.#timePrecision_ = timePrecision;
+        this.#randomSeed_ = randomSeed;
+
+    }
+
+    //Private methods
+    moveHorizontal(dCol) {
+    }
+
+    checkLock() {
+    }
+
+    lock() {
+    }
+
+    spawnPiece() {
+    }
+
+    updateScore(linesCleared) {
+    }
+
+    const
+    secondsPerLineForLevel = (level) => Math.pow(0.8 - (level - 1) * 0.007, level - 1);
+
+    //Public methods
+    restart(level) {
+    };
+
+    isGameOver = () => this.#gameOver_;
+
+    /**
+     * Pass the flags and do corresponding actions
+     * @param softDrop Boolean
+     * @param moveRight Boolean
+     * @param moveLeft Boolean
+     */
+    update(softDrop, moveRight, moveLeft) {
+    }
+
+    rotate(rotation) {
+    }
+
+    hardDrop() {
+    }
+
+    hold() {
+    }
+
+    const
+    lockPercent = () => this.#lockingTimer_ / this.#lockDownTimeLimit_;
+
+    const
+    isPausedForLinesClear = () => this.#pausedForLinesClear_;
+
+
+    const
+    linesClearPausePercent = () => this.#linesClearTimer_ / this.#pauseAfterLineClear_;
+
+    const
+    level = () => this.#level_;
+
+    const
+    score = () => this.#score_;
+
+    const
+    linesCleared = () => this.#linesCleared_;
+
+    const
+    nextPiece = () => new Tile(this.#bag_[this.#nextTile_]);
+
+    const
+    heldPiece = () => new Tile(this.#tileOnHold_);
+
+
 }
 
-function oneByFour()
-{
-	this.pos = [0 ,3, 0, 4, 0, 5, 0, 6];
-	
-	this.color = [];
-	
-	this.setColor = function(color)
-	{
-		this.color = color;
-	}
-	
-	this.object = function()
-	{
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], true);
-			i++;
-		}
-	}
-	
-	this.checkBottom = function()
-	{
-		var taken = false;
-		if(rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270)
-		{
-			check = grid.get((this.pos[i] + 1), this.pos[i + 1], 4);
-			i++;
-			if(check == true)
-			{
-				taken = true;
-			}
-		}
-		if(rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180)
-		{
-			var p;
-			var up = this.pos[0];
-			var down = this.pos[6];
-			if(up > down)
-			{
-				p = up;
-			}
-			if(down > up) 
-			{
-				p = down;
-			}
-			
-			if(p < 14 && !grid.get(down + 1, this.pos[1], 4))
-			{
-				return false;
-			}
-			else 
-			{
-				return true;
-			}
-			
-		}
-		return taken;
-	}
-	
-	this.objectGravity = function()
-	{
-		for(var i = 0; i < 8; i++)
-		{
-			grid.setPlace(this.pos[i], this.pos[i + 1], false);
-			i++;
-		}
-		
-		for(var i = 0; i < 8; i++)
-		{
-			oldPlace = this.pos[i];
-			this.pos[i] = oldPlace + 1;
-			grid.setPlace(this.pos[i], this.pos[i + 1], true);
-			i++;
-		}
-	}
-	
-	this.checkLeft = function()
-	{
-		if(rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270)
-		{
-			var position;
-			var left = this.pos[1];
-			var right = this.pos[7];
-			
-			if(left == 0 || right == 0)
-			{
-				taken = true;
-				return taken;
-			}
-			if(left < right)
-			{
-				position = this.pos[1] - 1;
-			}	
-			if(right < left)
-			{
-				position = this.pos[7] - 1;
-			}
-			
-			if(position >= 0)
-			{
-				taken = grid.get(this.pos[0], position, 4);
-			}
-		}
-		if(rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180)
-		{
-			if((this.pos[1] - 1) < 0)
-			{
-				taken = true;
-			}
-			else
-			{
-				var m = grid.get(this.pos[0], this.pos[1] - 1, 4);
-				var j = grid.get(this.pos[2], this.pos[1] - 1, 4);
-				var u = grid.get(this.pos[4], this.pos[1] - 1, 4);
-				var t = grid.get(this.pos[6], this.pos[1] - 1, 4);
-				
-				if(!m && !j && !u && !t)
-				{
-					taken = false;
-				}
-				else
-				{
-					taken = true;
-				}
-			}
-		}		
-		return taken;
-	}
-	
-	this.checkRight = function()
-	{
-		if(rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270)
-		{
-			var position;
-			var left = this.pos[1];
-			var right = this.pos[7];
-			
-			if(left == 9 || right == 9)
-			{
-				taken = true;
-				return taken;
-			}
-			if(left > right)
-			{
-				position = this.pos[1] + 1;
-			}	
-			if(right > left)
-			{
-				position = this.pos[7] + 1;
-			}
-			
-			if(position <= 9)
-			{
-				taken = grid.get(this.pos[0], position, 4);
-			}
-		}
-		if(rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180)
-		{
-			if((this.pos[1] - 1) < 0)
-			{
-				taken = true;
-			}
-			else
-			{
-				var m = grid.get(this.pos[0], this.pos[1] - 1, 4);
-				var j = grid.get(this.pos[2], this.pos[1] - 1, 4);
-				var u = grid.get(this.pos[4], this.pos[1] - 1, 4);
-				var t = grid.get(this.pos[6], this.pos[1] - 1, 4);
-				
-				if(!m && !j && !u && !t)
-				{
-					taken = false;
-				}
-				else
-				{
-					taken = true;
-				}
-			}
-		}		
-		return taken;
-	}
-	
-	this.moveLeft = function()
-	{
-		if(!this.checkLeft())
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i], this.pos[i + 1], false);
-				i++;
-			}
-			for(var i = 0; i < 8; i++)
-			{
-				--this.pos[i + 1];
-				grid.setPlace(this.pos[i], this.pos[i + 1], true);
-				i++;
-			}
-			posX -= 1;
-		}
-	}
-	
-	this.moveRight = function()
-	{
-		if(!this.checkRight())
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i], this.pos[i + 1], false);
-				i++;
-			}
-			for(var i = 0; i < 8; i++)
-			{
-				++this.pos[i + 1];
-				grid.setPlace(this.pos[i], this.pos[i + 1], true);
-				i++;
-			}
-			posX += 1;
-		}
-	}
-	
-	this.drop = function()
-	{
-		falling = true;
-		
-		if(rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270)
-		{
-			var taken = false;
-			var row = this.pos[0];
-			var stop = row;
-			var rowsLeft = 14 - row;
-			
-			for(var i = 1; rowsLeft >= 0 && !taken; --rowsLeft)
-			{
-				for(var j = 0; j < 8 && !taken; j++)
-				{
-					taken = grid.get((this.pos[j] + i), this.pos[j + 1], 4);
-					if(taken == true)
-					{
-						stop = (this.pos[j] + i - 1);
-					}
-					j++;
-				}
-				i++;
-			}
-			var rowsFallen = stop - row;
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i], this.pos[i + 1], false);
-				oldPlace = this.pos[i];
-				this.pos[i] = stop;
-				grid.setPlace(this.pos[i], this.pos[i+1], true);
-				i++;
-			}
-			posY -= rowsFallen;
-		}
-		
-		if(rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180)
-		{
-			var taken = false;
-			var position;
-			var up = this.pos[0];
-			var down = this.pos[6];
-			if(up > down)
-			{
-				position = up;
-			}
-			if(down > up)
-			{
-				position = down;
-			}
-			var stopAt = position;
-			
-			var rowsLeft = 14 - position;
-			for(var i = 1; rowsLeft >= 0 && !taken; --rowsLeft)
-			{
-				taken = grid.get(position + i, this.pos[1], 4);
-				if(taken)
-				{
-					stopAt = position + i - 1;
-				}
-				i++;
-			}
-			var rowsFallen = stopAt - position;
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i]. this.pos[i+1], false);
-				i++;
-			}
-			var count = 0;
-			for(var i = 0; i < 8; i++)
-			{
-				oldPlace = this.pos[i];
-				this.pos[i] = stopAt - count;
-				grid.setPlace(this.pos[i], this.pos[i+1], true);
-				i++;
-				count++;
-			}
-			posY -= rowsFallen;
-		}
-	}
-	
-	this.rotate = function()
-	{
-		var taken = false;
-		if(beforeRotate == 90 && this.pos[0] == 0 || beforeRotate == -90 && this.pos[0] == 0)
-		{
-			return false;
-		}
-		else if(beforeRotate == 0 && this.pos[1] == 0 || beforeRotate == 0 && this.pos[1] == 1 || beforeRotate == 0 && this.pos[1] == 8 || beforeRotate == 0 && this.pos[1] == 9 || beforeRotate == 180 && this.pos[1] == 0 || beforeRotate == 180 && this.pos[1] == 1 || beforeRotate == 180 && this.pos[1] == 8 || beforeRotate == 180 && this.pos[1] == 9 || beforeRotate == -180 && this.pos[1] == 0 ||	beforeRotate == -180 && this.pos[1] == 1 ||	beforeRotate == -180 && this.pos[1] == 8 || beforeRotate == -180 && this.pos[1] == 9)
-		{
-			return false;
-		}
-		else
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i]. this.pos[i+1], false);
-				i++;
-			}
-			
-			if(beforeRotate == 90 || beforeRotate == -90)
-			{
-				taken = false;
-				for(var i =0; i< 8 && !taken; i++)
-				{
-					for(var j = -1; j < 3 && !taken; j++)
-					{
-						taken = grid.get(this.pos[i] + j, this.pos[i+1], 4);
-						
-					}
-					i++;
-				}
-			}
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i]. this.pos[i+1], true);
-				i++;
-			}
-			return !taken;
-		}
-	}
-	
-	this.positonRotate = funtion()
-	{
-		var position1 = null;
-		var position2 = null;
-		
-		var left = this.pos[1];
-		var right = this.pos[7];
-		
-		if(left != right)
-		{
-			if(left < right)
-			{
-				position1 = 1;
-			}
-			if(right < left)
-			{
-				position1 = 7;
-			}
-		} 
-		else
-		{
-			var up = this.pos[0];
-			var down = this.pos[6];
-			
-			if(up > down)
-			{
-				position2 = 0;
-			}
-			if(down > up)
-			{
-				position2 = 6;
-			}
-		}
-		if(clockwise &&(beforeRotate == 90 || beforeRotate == -90) || clockwise &&(beforeRotate == 270 || beforeRotate == -270) || counterclock && beforeRotate == 0 || counterclock && (beforeRotate == 180 || beforeRotate == -180))
-		{
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i]. this.pos[i+1], false);
-				i++;
-			}
-			
-			this.pos[position1] += 2;
-			this.pos[position1 - 1] -= 1;
-			this.pos[position1 + 2] += 1;
-			this.pos[position1 + 3] += 1;
-			this.pos[position1 + 5] += 2;
-			this.pos[position1 + 6] -= 1;
-			
-			for(var i = 0; i < 8; i++)
-			{
-				grid.setPlace(this.pos[i]. this.pos[i+1], true);
-				i++;
-			}
-			
-		}
-		
-	}
+//Block of a Tetris
+class Tile {
+
+    #tileType_; //Use defined enumerate Plz
+    #tileColor_;
+    #nStates_;
+    #state_;
+    #nRows_;
+    #nCols_;
+    #initialShape_ = []; //type: Color
+    #shape_ = []; //type: Color
+    #bBoxSide_;
+
+    #kicksLeft_;
+    #kicksRight_;
+
+    const
+    kicksIRight_ = [
+        [[0, 0], [0, -2], [0, 1], [1, -2], [-2, 1]],
+        [[0, 0], [0, -1], [0, 2], [-2, -1], [1, 2]],
+        [[0, 0], [0, 2], [0, -1], [-1, 2], [2, -1]],
+        [[0, 0], [0, 1], [0, -2], [2, 1], [-1, -2]]
+    ];
+    const
+    kicksILeft_ = [
+        [[0, 0], [0, -1], [0, 2], [-2, -1], [1, 2]],
+        [[0, 0], [0, 2], [0, -1], [-1, 2], [2, -1]],
+        [[0, 0], [0, 1], [0, -2], [2, 1], [-1, -2]],
+        [[0, 0], [0, -2], [0, 1], [1, -2], [-2, 1]]
+    ];
+    const
+    kicksOtherRight_ = [
+        [[0, 0], [0, 1], [-1, -1], [2, 0], [2, -1]],
+        [[0, 0], [0, 1], [1, 1], [-2, 0], [-2, 1]],
+        [[0, 0], [0, 1], [-1, 1], [2, 0], [2, 1]],
+        [[0, 0], [0, -1], [1, -1], [-2, 0], [-2, -1]]
+    ];
+    const
+    kicksOtherLeft_ = [
+        [[0, 0], [0, 1], [-1, 1], [2, 0], [2, 1]],
+        [[0, 0], [0, -1], [1, 1], [-2, 0], [-2, 1]],
+        [[0, 0], [0, -1], [-1, -1], [2, 0], [2, -1]],
+        [[0, 0], [0, -1], [1, -1], [-2, 0], [-2, -1]]
+    ];
+
+
+    constructor(type) {
+        this.#tileType_ = type;
+        this.#tileColor_ = NaN;
+        this.#kicksLeft_ = [];
+        this.#kicksRight_ = [];
+    }
+
+    const
+    tileType = () => this.#tileType_;
+    const
+    tileColor = () => this.#tileColor_;
+    const
+    nRow = () => this.#nRows_;
+    const
+    nCOl = () => this.#nCols_;
+    const
+    bBoxSide = () => this.#bBoxSide_;
+    const
+    initialShape = () => this.#initialShape_;
+    const
+    shape = () => this.#shape_;
+
+    rotate(rotation) {
+
+    }
+
+    kicks(rotation) {
+
+    }
+
 }
 
-function tetrimon()
-{
-	var tetri = Math.floor(Math.random() * Math.floor(2));
-	
-	if(tetri == 0)
-	{
-		current = new twoByTwo();
-		tetriType = "twoByTwo";
-	}
-	else{
-		current = new oneByFour();
-		tetriType = "oneByFour";
-	}
+function twoByTwo() {
+    this.pos = [0, 4, 0, 5, 1, 4, 1, 5];
+
+    this.color = [];
+
+    this.setColor = function (color) {
+        this.color = color;
+    }
+
+    this.object = function () {
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], true);
+            i++;
+        }
+    }
+
+    this.checkBottom = function () {
+        var taken = false;
+        if (grid.get((this.pos[4] + 1), this.pos[5], 4) || grid.get((this.pos[6] + 1), this.pos[7], 4)) {
+            taken = true;
+        }
+        return taken;
+
+    }
+
+    this.objectGravity = function () {
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], false);
+            i++;
+        }
+
+        for (var i = 0; i < 8; i++) {
+            oldPlace = this.pos[i];
+            this.pos[i] = oldPlace + 1;
+            grid.setPlace(this.pos[i], this.pos[i + 1], true);
+            i++;
+        }
+    }
+
+    this.checkLeft = function () {
+        var taken = null;
+        var position;
+        var left = this.pos[1];
+        var right = this.pos[7];
+
+        if (left == 0 || right == 0) {
+            taken = true;
+            return taken;
+        }
+
+        if (left < right) {
+            position = this.pos[1] - 1;
+        }
+        if (right < left) {
+            position = this.pos[7] - 1;
+        }
+
+        if (position >= 0) {
+            var a = grid.get(this.pos[0], position, 4);
+            var b = grid.get(this.pos[4], position, 4);
+            if (!a && !b) {
+                taken = false;
+
+            } else {
+                taken = true;
+            }
+        }
+        return taken;
+    }
+
+    this.checkRight = function () {
+        var taken = null;
+        var position;
+        var left = this.pos[1];
+        var right = this.pos[7];
+
+        if (left == 9 || right == 9) {
+            taken = true;
+            return taken;
+        }
+
+        if (left > right) {
+            position = this.pos[1] + 1;
+        }
+        if (right > left) {
+            position = this.pos[7] + 1;
+        }
+
+        if (position <= 9) {
+            var a = grid.get(this.pos[0], position, 4);
+            var b = grid.get(this.pos[4], position, 4);
+            if (!a && !b) {
+                taken = false;
+
+            } else {
+                taken = true;
+            }
+        }
+        return taken;
+    }
+
+    this.moveLeft = function () {
+        if (!this.checkLeft()) {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i], this.pos[i + 1], false);
+                i++;
+            }
+            for (var i = 0; i < 8; i++) {
+                --this.pos[i + 1];
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+            }
+            posX -= 1;
+        }
+    }
+
+    this.moveRight = function () {
+        if (!this.checkRight()) {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i], this.pos[i + 1], false);
+                i++;
+            }
+            for (var i = 0; i < 8; i++) {
+                ++this.pos[i + 1];
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+            }
+            posX += 1;
+        }
+    }
+
+    this.drop = function () {
+        falling = true;
+
+        var taken = false;
+        var row = this.pos[4];
+        var stop = row;
+        var rowsLeft = 14 - row;
+        for (var i = 1; rowsLeft >= 0 && !taken; --rowsLeft) {
+            taken = grid.get((this.pos[4] + i), this.pos[5], 4);
+            if (taken) {
+                stop = this.pos[4] + i - 1;
+            } else {
+                taken = grid.get((this.pos[6] + i), this.pos[7], 4);
+                if (taken) {
+                    stop = this.pos[4] + i - 1;
+                }
+            }
+            i++;
+        }
+
+        var rowsFallen = stop - row;
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], false);
+            i++;
+        }
+
+        this.pos[0] = stop - 1;
+        this.pos[2] = stop - 1;
+        this.pos[4] = stop;
+        this.pos[6] = stop;
+
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], true);
+            i++;
+        }
+        posY -= rowsFallen;
+        falling = false;
+    }
 }
 
-function game()
-{
-	r = Math.random();
-	g = Math.random();
-	b = Math.random();
-	
-	r2 = r + .4;
-	g2 = g + .4;
-	b2 = b + .4;
-	
-	grid = new gameGrid();
-	
-	tetrimon();
-	
-	current.object();
+function oneByFour() {
+    this.pos = [0, 3, 0, 4, 0, 5, 0, 6];
+
+    this.color = [];
+
+    this.setColor = function (color) {
+        this.color = color;
+    }
+
+    this.object = function () {
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], true);
+            i++;
+        }
+    }
+
+    this.checkBottom = function () {
+        var taken = false;
+        if (rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270) {
+            check = grid.get((this.pos[i] + 1), this.pos[i + 1], 4);
+            i++;
+            if (check == true) {
+                taken = true;
+            }
+        }
+        if (rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180) {
+            var p;
+            var up = this.pos[0];
+            var down = this.pos[6];
+            if (up > down) {
+                p = up;
+            }
+            if (down > up) {
+                p = down;
+            }
+
+            if (p < 14 && !grid.get(down + 1, this.pos[1], 4)) {
+                return false;
+            } else {
+                return true;
+            }
+
+        }
+        return taken;
+    }
+
+    this.objectGravity = function () {
+        for (var i = 0; i < 8; i++) {
+            grid.setPlace(this.pos[i], this.pos[i + 1], false);
+            i++;
+        }
+
+        for (var i = 0; i < 8; i++) {
+            oldPlace = this.pos[i];
+            this.pos[i] = oldPlace + 1;
+            grid.setPlace(this.pos[i], this.pos[i + 1], true);
+            i++;
+        }
+    }
+
+    this.checkLeft = function () {
+        if (rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270) {
+            var position;
+            var left = this.pos[1];
+            var right = this.pos[7];
+
+            if (left == 0 || right == 0) {
+                taken = true;
+                return taken;
+            }
+            if (left < right) {
+                position = this.pos[1] - 1;
+            }
+            if (right < left) {
+                position = this.pos[7] - 1;
+            }
+
+            if (position >= 0) {
+                taken = grid.get(this.pos[0], position, 4);
+            }
+        }
+        if (rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180) {
+            if ((this.pos[1] - 1) < 0) {
+                taken = true;
+            } else {
+                var m = grid.get(this.pos[0], this.pos[1] - 1, 4);
+                var j = grid.get(this.pos[2], this.pos[1] - 1, 4);
+                var u = grid.get(this.pos[4], this.pos[1] - 1, 4);
+                var t = grid.get(this.pos[6], this.pos[1] - 1, 4);
+
+                if (!m && !j && !u && !t) {
+                    taken = false;
+                } else {
+                    taken = true;
+                }
+            }
+        }
+        return taken;
+    }
+
+    this.checkRight = function () {
+        if (rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270) {
+            var position;
+            var left = this.pos[1];
+            var right = this.pos[7];
+
+            if (left == 9 || right == 9) {
+                taken = true;
+                return taken;
+            }
+            if (left > right) {
+                position = this.pos[1] + 1;
+            }
+            if (right > left) {
+                position = this.pos[7] + 1;
+            }
+
+            if (position <= 9) {
+                taken = grid.get(this.pos[0], position, 4);
+            }
+        }
+        if (rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180) {
+            if ((this.pos[1] - 1) < 0) {
+                taken = true;
+            } else {
+                var m = grid.get(this.pos[0], this.pos[1] - 1, 4);
+                var j = grid.get(this.pos[2], this.pos[1] - 1, 4);
+                var u = grid.get(this.pos[4], this.pos[1] - 1, 4);
+                var t = grid.get(this.pos[6], this.pos[1] - 1, 4);
+
+                if (!m && !j && !u && !t) {
+                    taken = false;
+                } else {
+                    taken = true;
+                }
+            }
+        }
+        return taken;
+    }
+
+    this.moveLeft = function () {
+        if (!this.checkLeft()) {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i], this.pos[i + 1], false);
+                i++;
+            }
+            for (var i = 0; i < 8; i++) {
+                --this.pos[i + 1];
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+            }
+            posX -= 1;
+        }
+    }
+
+    this.moveRight = function () {
+        if (!this.checkRight()) {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i], this.pos[i + 1], false);
+                i++;
+            }
+            for (var i = 0; i < 8; i++) {
+                ++this.pos[i + 1];
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+            }
+            posX += 1;
+        }
+    }
+
+    this.drop = function () {
+        falling = true;
+
+        if (rotateAngle == 90 || rotateAngle == -90 || rotateAngle == 270 || rotateAngle == -270) {
+            var taken = false;
+            var row = this.pos[0];
+            var stop = row;
+            var rowsLeft = 14 - row;
+
+            for (var i = 1; rowsLeft >= 0 && !taken; --rowsLeft) {
+                for (var j = 0; j < 8 && !taken; j++) {
+                    taken = grid.get((this.pos[j] + i), this.pos[j + 1], 4);
+                    if (taken == true) {
+                        stop = (this.pos[j] + i - 1);
+                    }
+                    j++;
+                }
+                i++;
+            }
+            var rowsFallen = stop - row;
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i], this.pos[i + 1], false);
+                oldPlace = this.pos[i];
+                this.pos[i] = stop;
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+            }
+            posY -= rowsFallen;
+        }
+
+        if (rotateAngle == 0 || rotateAngle == -180 || rotateAngle == 180) {
+            var taken = false;
+            var position;
+            var up = this.pos[0];
+            var down = this.pos[6];
+            if (up > down) {
+                position = up;
+            }
+            if (down > up) {
+                position = down;
+            }
+            var stopAt = position;
+
+            var rowsLeft = 14 - position;
+            for (var i = 1; rowsLeft >= 0 && !taken; --rowsLeft) {
+                taken = grid.get(position + i, this.pos[1], 4);
+                if (taken) {
+                    stopAt = position + i - 1;
+                }
+                i++;
+            }
+            var rowsFallen = stopAt - position;
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i].this.pos[i + 1], false);
+                i++;
+            }
+            var count = 0;
+            for (var i = 0; i < 8; i++) {
+                oldPlace = this.pos[i];
+                this.pos[i] = stopAt - count;
+                grid.setPlace(this.pos[i], this.pos[i + 1], true);
+                i++;
+                count++;
+            }
+            posY -= rowsFallen;
+        }
+    }
+
+    this.rotate = function () {
+        var taken = false;
+        if (beforeRotate == 90 && this.pos[0] == 0 || beforeRotate == -90 && this.pos[0] == 0) {
+            return false;
+        } else if (beforeRotate == 0 && this.pos[1] == 0 || beforeRotate == 0 && this.pos[1] == 1 || beforeRotate == 0 && this.pos[1] == 8 || beforeRotate == 0 && this.pos[1] == 9 || beforeRotate == 180 && this.pos[1] == 0 || beforeRotate == 180 && this.pos[1] == 1 || beforeRotate == 180 && this.pos[1] == 8 || beforeRotate == 180 && this.pos[1] == 9 || beforeRotate == -180 && this.pos[1] == 0 || beforeRotate == -180 && this.pos[1] == 1 || beforeRotate == -180 && this.pos[1] == 8 || beforeRotate == -180 && this.pos[1] == 9) {
+            return false;
+        } else {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i].this.pos[i + 1], false);
+                i++;
+            }
+
+            if (beforeRotate == 90 || beforeRotate == -90) {
+                taken = false;
+                for (var i = 0; i < 8 && !taken; i++) {
+                    for (var j = -1; j < 3 && !taken; j++) {
+                        taken = grid.get(this.pos[i] + j, this.pos[i + 1], 4);
+
+                    }
+                    i++;
+                }
+            }
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i].this.pos[i + 1], true);
+                i++;
+            }
+            return !taken;
+        }
+    }
+
+    this.positonRotate = funtion()
+    {
+        var position1 = null;
+        var position2 = null;
+
+        var left = this.pos[1];
+        var right = this.pos[7];
+
+        if (left != right) {
+            if (left < right) {
+                position1 = 1;
+            }
+            if (right < left) {
+                position1 = 7;
+            }
+        } else {
+            var up = this.pos[0];
+            var down = this.pos[6];
+
+            if (up > down) {
+                position2 = 0;
+            }
+            if (down > up) {
+                position2 = 6;
+            }
+        }
+        if (clockwise && (beforeRotate == 90 || beforeRotate == -90) || clockwise && (beforeRotate == 270 || beforeRotate == -270) || counterclock && beforeRotate == 0 || counterclock && (beforeRotate == 180 || beforeRotate == -180)) {
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i].this.pos[i + 1], false);
+                i++;
+            }
+
+            this.pos[position1] += 2;
+            this.pos[position1 - 1] -= 1;
+            this.pos[position1 + 2] += 1;
+            this.pos[position1 + 3] += 1;
+            this.pos[position1 + 5] += 2;
+            this.pos[position1 + 6] -= 1;
+
+            for (var i = 0; i < 8; i++) {
+                grid.setPlace(this.pos[i].this.pos[i + 1], true);
+                i++;
+            }
+
+        }
+
+    }
+}
+
+function tetrimon() {
+    var tetri = Math.floor(Math.random() * Math.floor(2));
+
+    if (tetri == 0) {
+        current = new twoByTwo();
+        tetriType = "twoByTwo";
+    } else {
+        current = new oneByFour();
+        tetriType = "oneByFour";
+    }
+}
+
+function game() {
+    r = Math.random();
+    g = Math.random();
+    b = Math.random();
+
+    r2 = r + .4;
+    g2 = g + .4;
+    b2 = b + .4;
+
+    grid = new gameGrid();
+
+    tetrimon();
+
+    current.object();
+}
+
+function handleKey(event) {
+// The key are same as official Tetris'
+    switch (event.code) {
+        case "Space": //Hard drop
+
+            break;
+        case "ArrowRight": // Move right
+
+            break;
+        case "ArrowLeft": // Move left
+
+            break;
+        case "ArrowUp": // Rotate right
+
+            break;
+        case "ArrowDown": // Soft drop
+
+            break;
+        case "KeyZ": //Rotate left
+
+        case "KeyC": //Hold
+
+            break;
+        case"Escape": //Pause the game
+
+            break;
+    }
 }
 
 function main() {
-  
-  setupWebGL(); // set up the webGL environment
-  shaders(); //sets up shaders
-  game();
-  
+
+    setupWebGL(); // set up the webGL environment
+    shaders(); //sets up shaders
+    game();
+
 }
