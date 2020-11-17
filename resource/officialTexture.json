@@ -1,0 +1,42 @@
+{
+    "normal":{
+        "I tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-I.png?cbid=7E82E7C934E0FA24",
+        "J tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-J.png?cbid=7E82E7C934E0FA24",
+        "L tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-L.png?cbid=7E82E7C934E0FA24",
+        "O tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-O.png?cbid=7E82E7C934E0FA24",
+        "S tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-S.png?cbid=7E82E7C934E0FA24",
+        "T tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-T.png?cbid=7E82E7C934E0FA24",
+        "Z tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-Z.png?cbid=7E82E7C934E0FA24",
+        "garbage tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-normal-~size-25~-garbage.png?cbid=7E82E7C934E0FA24"
+    },
+    "ghost":{
+        "I tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-I.png?cbid=7E82E7C934E0FA24",
+        "J tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-J.png?cbid=7E82E7C934E0FA24",
+        "L tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-L.png?cbid=7E82E7C934E0FA24",
+        "O tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-O.png?cbid=7E82E7C934E0FA24",
+        "S tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-S.png?cbid=7E82E7C934E0FA24",
+        "T tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-T.png?cbid=7E82E7C934E0FA24",
+        "Z tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-Z.png?cbid=7E82E7C934E0FA24",
+        "garbage tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-ghost-~size-25~-garbage.png?cbid=7E82E7C934E0FA24"
+    },
+    "locked":{
+        "I tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-I.png?cbid=7E82E7C934E0FA24",
+        "J tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-J.png?cbid=7E82E7C934E0FA24",
+        "L tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-L.png?cbid=7E82E7C934E0FA24",
+        "O tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-O.png?cbid=7E82E7C934E0FA24",
+        "S tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-S.png?cbid=7E82E7C934E0FA24",
+        "T tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-T.png?cbid=7E82E7C934E0FA24",
+        "Z tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-Z.png?cbid=7E82E7C934E0FA24",
+        "garbage tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-locked-~size-25~-garbage.png?cbid=7E82E7C934E0FA24"
+    },
+    "dying":{
+        "I tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-I.png?cbid=7E82E7C934E0FA24",
+        "J tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-J.png?cbid=7E82E7C934E0FA24",
+        "L tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-L.png?cbid=7E82E7C934E0FA24",
+        "O tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-O.png?cbid=7E82E7C934E0FA24",
+        "S tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-S.png?cbid=7E82E7C934E0FA24",
+        "T tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-T.png?cbid=7E82E7C934E0FA24",
+        "Z tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-Z.png?cbid=7E82E7C934E0FA24",
+        "garbage tile":"https://tetris.com/games-content/play-tetris-content/resources/project-tetriscom/game/game-7E82E7C934E0FA24/res/raw-assets/resources/Tetrion-resources/resources-default/art/minos/mino-01-dying-~size-25~-garbage.png?cbid=7E82E7C934E0FA24"
+    }
+}
