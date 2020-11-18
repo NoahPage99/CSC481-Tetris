@@ -96,8 +96,7 @@ function shader(char1, char2) {
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
         throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);
         gl.deleteShader(fragmentShader);
-    else
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+    }else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
             throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
             gl.deleteShader(vertexShader);
         } else {
@@ -115,7 +114,7 @@ function shader(char1, char2) {
                 id = shaderProgram;
             }
         }
-    }
+    
 }
 
 function textureBind() {
@@ -1638,27 +1637,27 @@ function handleKey(event) {
 // The key are same as official Tetris'
     switch (event.code) {
         case "Space": //Hard drop
-
+			hardDrop();
             break;
         case "ArrowRight": // Move right
-
+			moveRight = true;
             break;
         case "ArrowLeft": // Move left
-
+			moveLeft = true;
             break;
         case "ArrowUp": // Rotate right
-
+		
             break;
         case "ArrowDown": // Soft drop
-
+			softDrop = true;
             break;
         case "KeyZ": //Rotate left
-
+			
         case "KeyC": //Hold
-
+			
             break;
         case"Escape": //Pause the game
-
+			GameState = Paused;
             break;
     }
 }
