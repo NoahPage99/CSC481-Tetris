@@ -25,9 +25,12 @@ var falling = false;
 
 //Enumerate
 const TileType = {NONE: -1, I: 0, J: 1, L: 2, O: 3, S: 4, T: 5, Z: 6, GARBAGE: 7};
-
+const TileColor = {NONE: -1, CYAN: 0, BLUE: 1, ORANGE: 2, YELLOW: 3, GREEN: 4, PURPLE: 5, RED: 6};
 const Rotation = {NONE: -1, CLOCKWISE: 90, COUNTERCLOCKWISE: -90};
 const Motion = {NONE: -1, LEFT: 0, RIGHT: 1};
+const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
+
+const NumPieces = 7;
 
 function setupWebGL() {
 
@@ -358,7 +361,11 @@ function getJSONFile(url, descr) {
     }
 } // end get input json file
 
-// does stuff whe
+// From https://gist.github.com/guilhermepontes/17ae0cc71fa2b13ea8c20c94c5c35dc4
+const shuffleArray = arr => arr
+    .map(a => [Math.random(), a])
+    .sort((a, b) => a[0] - b[0])
+    .map(a => a[1]);
 
 
 class gameGrid {
@@ -369,112 +376,191 @@ class gameGrid {
     #tile_;
     #nRows_;
     #nCols_;
+    //Store current row and col states
+    #row_;
+    #col_;
     #ghostRow_; //Ghost is a predictor on how tile will be looks like
+    rowsAbove_ = 2;
 
     constructor(row, col) {
         this.#nRows_ = row;
         this.#nCols_ = col;
+        this.#tiles_ = new Array((row + this.rowsAbove_) * col);
+        this.#tile_ = NaN;
     }
 
-    /**Clear the board
-     *
+    /**
+     * Clear the Game Board
      */
     clear() {
-
+        this.#tiles_.fill(TileColor.NONE, 0, this.#tiles_.length);
     }
 
     // TileColor tileAt(int row, int col) const { return tiles_[(row + kRowsAbove_) * nCols + col]; };
     /**
-     * Tile at
+     * Return tile at specific location
      * @param row
      * @param col
+     * @returns {*}
      */
-    tileAt(row, col) {
+    tileAt = (row, col) => this.#tiles_[(row + this.rowsAbove_) * this.#nCols_ + col];
 
+
+    checkGridOverflow() {
+        let shape = this.#tile_.tileType();
+        let belowTopGrid = false;
+        let index = 0;
+        for (let row = this.#row_; row < this.#row_ + this.#tile_.bBoxSide(); row++) {
+            for (let col = this.#col_; col < this.#col_ + this.#tile_.bBoxSide(); ++col) {
+                if (shape[index] != TileColor.NONE) {
+                    if (row >= 0)
+                        belowTopGrid = true;
+
+                    this.setTile(row, col, shape[index]);
+                }
+                ++index;
+            }
+        }
+        this.findLinesToClear();
+        this.#tile_ = new Tile(TileType.NONE);
+        return belowTopGrid;
     }
 
     /**
      *
+     * @param typeOfTile
+     * @returns {boolean}
      */
-    frozeTile() {
+    generateTile(typeOfTile) {
+        this.#tile_ = new Tile(typeOfTile);
+        this.#row_ = -2;
+        this.#col = (this.#nCols_ - this.#tile_.bBoxSide()) / 2;
+
+        if (!this.checkPosition(this.#row_, this.#col_, this.#tile_))
+            return false;
+
+        let maxMoveDown = typeOfTile == TileType.I ? 1 : 2;
+        for (let i = 0; i < maxMoveDown; ++i) {
+            if (!this.checkPosition(this.#row_ + 1, this.#col_, this.#tile_))
+                break;
+            this.#row_++;
+        }
+        this.updateGhostRow();
+        return true;
+
+    }
+
+
+    /**
+     *
+     * @param col
+     * @returns {boolean}
+     */
+    moveHorizontal(col) {
+        if (this.checkPosition(this.#row_, this.#col_ + col, this.#tile_)) {
+            this.#col_ += col;
+            this.updateGhostRow();
+            return true;
+        }
+
+        return false;
     }
 
     /**
      *
-     * @param TypeOfTile
+     * @param row
+     * @returns {boolean}
      */
-    generateTile(TypeOfTile) {
-    }
+    moveVertical(row) {
+        if (this.checkPosition(this.#row_, this.#col_ + col, this.#tile_)) {
+            this.#row_ += row;
+            return true;
+        }
 
-    /**
-     *
-     * @param dCol
-     */
-    moveHorizontal(dCol) {
-    }
-
-    /**
-     *
-     * @param dRow
-     */
-    moveVertical(dRow) {
+        return false;
     }
 
     /**
      *
      * @param rotation Rotation degree default is 90
      * @param direct Clockwise > 0, CounterClockwise < 0
+     * @returns {boolean}
      */
     rotate(rotation, direct) {
+        if (this.#tile_.tileType == TileType.O || this.#tile_.tileType == TileType.NONE)
+            return false;
 
+        let testPiece = new Tile(this.#tile_);
+        testPiece.rotate(rotation);
+
+        for (let kick in this.#tile_.kicks(rotation)) {
+            // Potential flaw
+            let row = kick[0];
+            let col = kick[1]
+            if (this.checkPosition(this.#row_ + row, this.#col_ + col, testPiece)) {
+                this.#tile__ = testPiece;
+                this.#row_ += row;
+                this.#col_ += col;
+                this.updateGhostRow();
+                return true;
+            }
+
+        }
+
+        return false;
     }
 
     /**
      *
+     * @returns {number}
      */
     hardDrop() {
-
+        let rowsPassed = this.#ghostRow_ - this.#row_;
+        this.#row_ = this.#ghostRow_;
+        return rowsPassed;
     }
 
     /**
      *
      */
     isOnGround() {
-
+        return this.checkPosition(this.#row_ + 1, this.#col_, this.#tile_);
     }
 
     /**
      *
      * @returns {((chunk: any) => 1) | number | ((chunk: ArrayBufferView) => number) | GLint | string | QueuingStrategySizeCallback<T>}
      */
-    const
     numLinesToClear = () => this.#linesToClear_.size;
 
     /**
      *
      */
     clearLines() {
+        if (!this.#linesToClear_) {
+            this.#linesToClear_.length = 0;
+            this.#tiles_ = this.#tilesAfterClear_;
+        }
     }
 
     /**
      *
      * @returns {{}}
      */
-    const
+
     LinesToClear = () => this.#linesToClear_;
 
     /**
      *
      * @returns {*}
      */
-    const
     Tile = () => this.#tile_;
 
     /**
      *
      * @returns {*}
      */
-    const
+
     tileCol = () => this.#nCols_;
 
     /**
@@ -492,7 +578,7 @@ class gameGrid {
      * @param tileColor
      */
     setTileOnBoard(row, col, tileColor) {
-
+        this.#tiles_[(row + this.rowsAbove_) * this.#nCols_ + col] = tileColor;
     }
 
     /**
@@ -501,7 +587,10 @@ class gameGrid {
      * @param col
      */
     isTileFilled(row, col) {
+        if (col < 0 || col >= this.#nCols_ || row < -this.rowsAbove_ || row >= this.#nRows_)
+            return true;
 
+        return this.tileAt(row, col) != TileColor.NONE;
     }
 
     /**
@@ -509,24 +598,75 @@ class gameGrid {
      * @param row
      * @param col
      * @param tile
+     * @returns {boolean}
      */
     checkPosition(row, col, tile) {
+        if (tile.tileType == TileType.NONE)
+            return false;
 
+        let shape = tile.shape();
+        let index = 0;
+        for (let i = 0; i < piece.bBoxSide(); i++) {
+            for (let j = 0; j < piece.bBoxSide(); j++) {
+                if (shape[index] != TileColor.NONE && this.isTileFilled(row + i, col + j))
+                    return false;
+
+                index++;
+            }
+        }
+
+        return true;
     }
 
     /**
      *
      */
     updateGhostRow() {
+        this.#ghostRow_ = this.#row_;
+        while (this.checkPosition(this.#ghostRow_ + 1, this.#col_, this.#tile_))
+            this.#ghostRow_++;
     }
 
     /**
      *
      */
-    findLInesToClear() {
+    findLinesToClear() {
+        this.#linesToClear_.length = 0;
+        this.#tilesAfterClear_ = this.#tiles_;
+
+        let linesCleared = 0;
+        let index = this.#tiles_.length - 1;
+        for (let i = this.#nRows_ - 1; i >= -this.rowsAbove_; i--) {
+            let fullRow = true;
+            for (let j = 0; j < this.#nCols_; ++j) {
+                if (!this.isTileFilled(i, j)) {
+                    fullRow = false;
+                    break;
+                }
+            }
+
+            if (fullRow) {
+                this.#linesToClear_.push(i);
+                linesCleared++;
+                index -= this.#nCols_;
+            } else if (linesCleared > 0) {
+                let indexShift = linesCleared * this.#nCols_;
+                for (let col = 0; col < this.#nCols_; ++col) {
+                    this.#tilesAfterClear_[index + indexShift] = this.#tiles_[index];
+                    index--;
+                }
+            } else {
+                index -= this.#nCols_;
+            }
+        }
+
+        this.#tilesAfterClear_.fill(TileColor.NONE, 0, this.#linesToClear_ * this.#nCols_);
 
     }
 
+    setTile(row, col, color) {
+        this.#tiles_[(row + this.rowsAbove_) * this.#nCols_s + col] = color;
+    }
 }
 
 class Tetris {
@@ -539,7 +679,8 @@ class Tetris {
     static #lockDownMovesLimit_;
     static #pauseAfterLineClear_;
 
-    #gameGrid;
+
+    #gameGrid_;
 
     //Flag for GG
     #gameOver_;
@@ -577,6 +718,19 @@ class Tetris {
         this.#gameGrid = gameGrid;
         this.#timePrecision_ = timePrecision;
         this.#randomSeed_ = randomSeed;
+        this.#bag_ = new Array(2 * NumPieces);
+        this.#nextTile_ = new Tile(TileType.NONE);
+        this.#tileOnHold_ = new Tile(TileType.NONE);
+
+        for (let i = 0; i < 2; i++) {
+            for (let type in TileType) {
+                if(type === TileType.NONE){
+                    continue;
+                }
+                this.#bag_.push(type);
+            }
+        }
+
 
     }
 
@@ -600,7 +754,36 @@ class Tetris {
     secondsPerLineForLevel = (level) => Math.pow(0.8 - (level - 1) * 0.007, level - 1);
 
     //Public methods
+
     restart(level) {
+        this.#gameGrid_.clear();
+        this.#gameOver_ = false;
+        this.#level_ = level;
+        this.#secondsPerLine_ = this.secondsPerLineForLevel(level);
+        this.#linesCleared_ = 0;
+        this.#score_ = 0;
+        this.#canHold_ = true;
+        this.#motion_ = Motion.NONE;
+        this.#moveLeftPrev_ = false;
+        this.#moveRightPrev_ = false;
+        this.#moveDownTimer_ = 0;
+        this.#moveRepeatTimer_ = 0;
+        this.#moveRepeatDelayTimer_ = 0;
+        this.#isOnGround_ = false;
+        this.#lockingTimer_ = 0;
+        this.#pausedForLinesClear_ = false;
+        this.#linesClearTimer_ = 0;
+
+        shuffleArray(this.#bag_[0:NumPieces]);
+
+
+        std::shuffle(bag_.begin(), bag_.begin() + kNumPieces, rng_);
+        std::shuffle(bag_.begin() + kNumPieces, bag_.end(), rng_);
+
+        std::uniform_int_distribution<int> holdPieceSelector(0, kNumPieces - 1);
+        this.#tileOnHold_ = this.#bag_[holdPieceSelector(this.#randomSeed_)];
+
+        spawnPiece();
     };
 
     isGameOver = () => this.#gameOver_;
