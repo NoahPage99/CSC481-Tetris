@@ -17,7 +17,7 @@ var falling;
 var rotateAngle = 90;
 var check;
 var beforeRotate = rotateAngle;
-
+var id;
 var clockwise = false;
 var counterclock = false;
 var rotating = false;
@@ -52,9 +52,176 @@ function setupWebGL() {
 
 } // end setupWebGL
 
+function shader(char1, char2)
+{
+	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	gl.shaderSource(vertexShader, 1, char1, null);
+	gl.compileShader(vertexShader);
+	
+	var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(fragmentShader, 1, char2, null);
+	gl.compileShader(fragmentShader);
+	
+	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
+            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);  
+            gl.deleteShader(fragmentShader);
+    else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+        throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);  
+        gl.deleteShader(vertexShader);
+    } else {
+			var shaderProgram = gl.createProgram();
+			gl.attachShader(shaderProgram, vertexShader);
+			gl.attachShader(shaderProgram, fragmentShader);
+			gl.linkProgram(shaderProgram);
+			
+			if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
+                throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
+            } else {
+				gl.deleteShader(vertexShader);
+				gl.deleteShader(fragmentShader);
+				
+				id = shaderProgram;
+			}
+		}
+}
+
+function textureBind()
+{
+	gl.bindTexture(gl.TEXTURE_2D, id);
+}
+
+function shaderSetFloat(name, value)
+{
+	gl.uniform1f(gl.getUniformLocation(id, name), value);
+}
+
+function shaderSetMat4(name, matrix)
+{
+	gl.uniformMatrix4fv(gl.getUniformLocation(id, name), 1, gl.FALSE, matrix);
+}
+
+function shaderSetVec3(name, vec)
+{
+	gl.uniform3f(gl.getUniformLocation(id, name), vec.x, vec.y, vec.z);
+}
+
+function setVec2(name, vec)
+{
+	gl.uniform2f(gl.getUniformLocation(id, name), vec.x, vec.y);
+}
+
+function use()
+{
+	gl.useProgram(id);
+}
+
+function loadRGBTex(path)
+{
+	
+}
+
+function textures(format, width, height, imag)
+{
+	gl.genTextures(1, id);
+	gl.bindTexture(gl.TEXTURE_2D, id);
+	gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, gl.UNSIGNED_BYTE, imag);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+}
+
 function shaders() {
     // define vertex shader in essl using es6 template strings
-    var vShaderCode = `
+	
+	var colorPrimVertexShader = `
+		layout (location = 0) in vec2 position;
+		uniform mat4 projection
+		
+		void main()
+		{
+			gl_Position = projection * vec4(position, 0, 1);
+		}	
+	`
+	
+	var colorPrimFragmentShader = `
+		uniform vec3 inColor;
+		out vec4 color;
+		
+		void main()
+		{
+			color = vec4(inColor, 1);
+		}
+	
+	`
+	
+	var tileVertexShader = `
+		layout (location = 0) in vec2 position;
+		layout (location = 1) in vec2 texCoord;
+		out vec2 texCoordFragment;
+		
+		uniform vec2 shift;
+		uniform vec2 scale = vec2(1,1);
+		uniform mat4 projection;
+		
+		void main()
+		{
+			gl_Position = projection * vec4(scale * position + shift, 0, 1);
+			texCoordFragment = texCoord;
+		}
+	`
+	
+	var tileFragmentShader = `
+		in vec2 texCoordFragment;
+		out vec4 color;
+		
+		uniform sampler2D sampler;
+		uniform vec3 mixture;
+		uniform float mixC = 0;
+		uniform float alpha = 1;
+		
+		void main()
+		{
+			color = mix(texture(sampler, texCoordFragment), vec4(mixture, 1), mixC);
+			color.a *= alpha;
+		}
+	
+	`
+	
+	var GlyphVertexShader = `
+		layout (location = 0) in vec2 position;
+		layout (location = 1) in vec2 texCoord;
+		out vec2 texCoordFragment;
+		
+		
+		uniform mat4 projection;
+		
+		void main()
+		{
+			gl_Position = projection * vec4(position, 0, 1);
+			texCoordFragment = texCoord;
+		}
+	`
+	
+	var GlyphFragmentShader = `
+		in vec2 texCoordFragment;
+		out vec4 color;
+		
+		uniform vec3 text;
+		uniform sampler2D glyph;
+		
+		void main()
+		{
+			float alpha = texture(glyph, texCoordFragment).r;
+			color = vec4(text, alpha);
+		}
+	
+	`
+	
+	var white = [1,1,1];
+	var black = [0,0,0];
+	
+  /**  var vShaderCode = `
         attribute vec3 aVertexPosition; // vertex position
         attribute vec3 aVertexNormal; // vertex normal
 		attribute vec3 aVertexColor;
@@ -159,7 +326,7 @@ function shaders() {
         }
     } catch (e) {
         console.log(e);
-    }
+    }*/
 
 }
 
@@ -1000,7 +1167,7 @@ function oneByFour() {
         }
     }
 
-    this.positonRotate = funtion()
+    this.positonRotate = function()
     {
         var position1 = null;
         var position2 = null;
@@ -1110,6 +1277,7 @@ function main() {
 
     setupWebGL(); // set up the webGL environment
     shaders(); //sets up shaders
-    game();
+	shader();
+   // game();
 
 }
