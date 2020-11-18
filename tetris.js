@@ -24,6 +24,7 @@ var counterclock = false;
 var rotating = false;
 var falling = false;
 var mainBuffer;
+var mainBuffer2;
 
 //Enumerate
 const TileType = {NONE: -1, I: 0, J: 1, L: 2, O: 3, S: 4, T: 5, Z: 6, GARBAGE: 7};
@@ -272,8 +273,8 @@ function shaders() {
 		textureBind();
 		use();
 		
-		var v = Vec2(x, y);
-		var v1 = Vec2(width, height);
+		var v = vec2.fromValues(x, y);
+		var v1 = vec2.fromValues(width, height);
 		
 		setVec2("shift", v);
 		setVec2("scale", v1);
@@ -286,17 +287,191 @@ function shaders() {
 		
 	}
 	
-	function PieceRenderShape(piece, c, y, mixC, mixColor, alphaMultiplier, startRow)
+	function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow)
 	{
 		
 		//unsure on piece.
 		
-		/**if(piece.kind() == NONE)
+		if(piece.kind() == NONE)
 		{
 			return;
 		}
-		var texture = */
+		var texture = piece.color();
+		
+		var i = startRow * piece.boxSide();
+		var shape = piece.shape();
+		for(var row = startRow; row < piece.boxSide(); row++)
+		{
+			for(var col = 0; col < piece.boxSide(); col++)
+			{
+				if(shape[i] != empty)
+				{
+					spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize, mixC, mixColor, alphaMultiplier);
+					i++;
+				}
+			}
+		}
 	}
+	
+	function pieceRenderInitialShape(piece, x, y)
+	{
+		
+		//unsure on piece.
+		
+		if(piece.kind() == NONE)
+		{
+			return;
+		}
+		var texture = piece.color();
+		
+		var i = 0;
+		var shape = piece.initialShape();
+		for(var row = 0; row < piece.nRow(); row++)
+		{
+			for(var col = 0; col < piece.nCols(); col++)
+			{
+				if(shape[i] != empty)
+				{
+					spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize);
+					i++;
+				}
+			}
+		}
+	}
+	
+	function renderShapedCentered(piece, x, y, width, height)
+	{
+		var pieceWidth = tileSize * piece.nCols();
+		var pieceHeight = tileSize * piece.nRow();
+		var xShift = .5 * (width - pieceWidth);
+		var yShift = .5 * (height - pieceHeight);
+		
+		pieceRenderInitialShape(piece, x + xShift, y + yShift);
+	}
+	
+	var background = vec3.fromValues(.05, .05, .05);
+	var gridColor = vec3.fromValues(.2, .2, .2);
+	
+	function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render)
+	{
+		use();
+		shaderSetMat4("projection", projection);
+		
+		var width = rows * tileSize;
+		var height = cols * tileSize;
+		
+		var vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
+		
+		var yGrid = y;
+		
+		for(var row = 0; row < rows + 1; ++row)
+		{
+			vertBack.push(x);
+			vertBack.push(yGrid);
+			vertBack.push(x + width);
+			vertBack.push(yGrid);
+			yGrid += tileSize;
+		}
+		
+		var xGrid = x;
+		
+		for(var col = 0; col < cols + 1; ++col)
+		{
+			vertBack.push(xGrid);
+			vertBack.push(y);
+			vertBack.push(xGrid);
+			vertBack.push(y + height);
+			xGrid += tileSize;
+		}
+		
+		var buffer;
+		gl.genBuffer(1, buffer);
+		gl.genVertexArrays(1, mainBuffer2);
+		gl.bindVertexArray(mainBuffer2);
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertback, gl.STATIC_DRAW);
+		gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, gl.FLOAT * 2, 0);
+		gl.enableVertexAttribArray(0);
+		gl.bindVertexArray(0);
+	}
+	
+	function renderBackground()
+	{
+		use();
+		gl.bindVertexArray(mainBuffer2);
+		shaderSetVec3("inColor", backgroundColor);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		shaderSetVec3("inColor", gridColor);
+		gl.drawArrays(gl.LINES, 4, 2 *(nRows_ + nCols_ + 2));
+	}
+	
+	function renderTiles(board, alphaMultiplier)
+	{
+		var row;
+		var col;
+		var x;
+		var y;
+		var yy = y_;
+		var xx = x_;
+		
+		for( var row = 0, y = yy; row < board.nRow; row++, y += tileSize)
+		{
+			for( var col = 0, x = xx; col < board.nCols; col++, x += tileSize)
+			{
+				var tile = board.tileAt(row, col);
+				if(tile == empty)
+				{
+					continue;
+				}
+				spriteRender(tile, x, y, tileSize, tileSize, 0, 0, alphaMultiplier);
+			}
+		}
+		
+	}
+	
+	function renderPiece(piece, row, col, lock, alphaMultiplier)
+	{
+		var startRow = Math.max(0, -row);
+		var mixC = .5 * Math.sin((Math.PI/2) * lock);
+		PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
+	}
+	
+	/**function renderGhost(piece, gRow, col)
+	{
+		var startRow = Math.max(0, -gRow);
+		
+	}*/
+	
+	function clearLinesAnimation(board, percent)
+	{
+		var t = .3;
+		var mixColor;
+		var mixC;
+		
+		if(percent < t)
+		{
+			var sin = Math.sin(Math.PI * percent / t);
+			mixColor = white;
+			mixC = .8 * sin;
+		}
+		else 
+		{
+			mixColor = black;
+			mixC = (percent - t) / (1 - t);
+		}
+		for(var row : board.linesToClear_())
+		{
+			for(var col = 0; col < nCols_; col++)
+			{
+				var x = x_ + col * tileSize;
+				var y = y_ + row * tileSize;
+				spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
+			}
+		}
+		
+	}
+	
 	
 
     /**  var vShaderCode = `
