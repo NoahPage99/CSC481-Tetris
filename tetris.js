@@ -2,6 +2,7 @@ var gl = null;
 var current;
 var tetri = null;
 var tetriType;
+var GameGrid = null;
 var r;
 var b;
 var g;
@@ -54,7 +55,7 @@ const BoardY = Margin;
 const HudPieceBoxHeight = 2.5 * TileSize;
 const FontSize = 18;
 
-const GameTimeStep = 0.005;
+const GameTimePrecision = 0.005;
 const Fps = 30;
 const SecondsPerFrame = 1.0 / Fps;
 
@@ -706,8 +707,6 @@ class Tetris {
 
     #timePrecision_;
 
-    // std::default_random_engine rng_;
-    #randomSeed_;
     #bag_;
     #nextTile_;
     #tileOnHold_;
@@ -733,10 +732,9 @@ class Tetris {
     #pausedForLinesClear_;
     #linesClearTimer_;
 
-    constructor(gameGrid, timePrecision, randomSeed) {
+    constructor(gameGrid, timePrecision) {
         this.#gameGrid = gameGrid;
         this.#timePrecision_ = timePrecision;
-        this.#randomSeed_ = randomSeed;
         this.#bag_ = new Array(2 * NumPieces);
         this.#nextTile_ = new Tile(TileType.NONE);
         this.#tileOnHold_ = new Tile(TileType.NONE);
@@ -754,9 +752,6 @@ class Tetris {
     }
 
     //Private methods
-    moveHorizontal(dCol) {
-    }
-
     checkLock() {
         if (!this.#gameGrid_.isOnGround()) {
             this.#isOnGround_ = false;
@@ -789,6 +784,18 @@ class Tetris {
     }
 
     spawnPiece() {
+        this.#gameOver_ = !board_.spawnPiece(this.#bag_[this.#nextTile_]);
+        this.#nextTile_++;
+        if (this.#nextTile_ == NumPieces) {
+
+            let tmp = this.#bag_.slice(NumPieces, this.#bag_.length);
+            this.#bag_.splice(0, tmp.length, ...tmp);
+            this.#bag = shuffleArray(this.#bag);
+
+
+            this.#nextTile_ = 0;
+        }
+        this.#nMovesWhileLocking_ = 0;
     }
 
     updateScore(linesCleared) {
@@ -811,7 +818,7 @@ class Tetris {
         }
         this.#linesCleared_ += linesCleared;
         this.#score_ += deltaScore * level_;
-        if (this.#level_ < this.#maxLevel_ && this.#linesCleared_ >= #linesToClearPerLevel_ * this.#level_) {
+        if (this.#level_ < this.#maxLevel_ && this.#linesCleared_ >= this.#linesToClearPerLevel_ * this.#level_) {
             this.#level_++;
             this.#secondsPerLine_ = this.secondsPerLineForLevel(this.#level_);
         }
@@ -888,24 +895,24 @@ class Tetris {
         let moveRightInput = moveRight;
 
         if (moveLeft && moveRight) {
-            if (!moveRightPrev_)
+            if (!this.#moveRightPrev_)
                 moveLeft = false;
-            else if (!moveLeftPrev_)
+            else if (!this.#moveLeftPrev_)
                 moveRight = false;
-            else if (motion_ == Motion::kLeft)
+            else if (this.#motion_ == Motion.LEFT)
                 moveRight = false;
             else
                 moveLeft = false;
         }
 
         if (moveRight) {
-            if (motion_ != Motion::kRight) {
+            if (this.#motion_ != Motion.Right) {
                 this.#moveRepeatDelayTimer_ = 0;
                 this.#moveRepeatTimer_ = 0;
                 this.moveHorizontal(1);
             } else if (this.#moveRepeatDelayTimer_ >= this.#moveRepeatDelay_ && this.#moveRepeatTimer_ >= this.#moveDelay_) {
                 this.#moveRepeatTimer_ = 0;
-                moveHorizontal(1);
+                THIS.moveHorizontal(1);
             }
             this.#motion_ = Motion::kRight;
         } else if (moveLeft) {
@@ -1579,6 +1586,9 @@ function game() {
     tetrimon();
 
     current.object();
+
+
+    // tetri = new Tetris(, GameTimePrecision)
 }
 
 function handleKey(event) {
