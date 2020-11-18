@@ -83,6 +83,7 @@ function shader(char1, char2)
 				id = shaderProgram;
 			}
 		}
+	}
 }
 
 function textureBind()
