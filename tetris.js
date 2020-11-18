@@ -1,6 +1,6 @@
 var gl = null;
 var current;
-var tetri;
+var tetri = null;
 var tetriType;
 var r;
 var b;
@@ -29,8 +29,35 @@ const TileColor = {NONE: -1, CYAN: 0, BLUE: 1, ORANGE: 2, YELLOW: 3, GREEN: 4, P
 const Rotation = {NONE: -1, CLOCKWISE: 90, COUNTERCLOCKWISE: -90};
 const Motion = {NONE: -1, LEFT: 0, RIGHT: 1};
 const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
-
+let CurGameState = GameState.Start;
+const NumStates = 4;
 const NumPieces = 7;
+
+let softDrop = false;
+let moveRight = false;
+let moveLeft = false;
+let startLevel = 1;
+
+const TileSize = 32;
+const GridNumRows = 20;
+const GridNumCols = 10;
+const GridWidth = GridNumCols * TileSize;
+const GridHeight = GridNumRows * TileSize;
+const Margin = 10;
+const HudWidth = 160;
+const Width = 3 * Margin + GridWidth + HudWidth;
+const Height = 2 * Margin + GridHeight;
+const HudX = Margin;
+const HudY = Margin;
+const BoardX = 2 * Margin + HudWidth;
+const BoardY = Margin;
+const HudPieceBoxHeight = 2.5 * TileSize;
+const FontSize = 18;
+
+const GameTimeStep = 0.005;
+const Fps = 30;
+const SecondsPerFrame = 1.0 / Fps;
+
 
 function setupWebGL() {
 
@@ -55,90 +82,82 @@ function setupWebGL() {
 
 } // end setupWebGL
 
-function shader(char1, char2)
-{
-	var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, 1, char1, null);
-	gl.compileShader(vertexShader);
-	
-	var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, 1, char2, null);
-	gl.compileShader(fragmentShader);
-	
-	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
-            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);  
-            gl.deleteShader(fragmentShader);
-    else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-        throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);  
-        gl.deleteShader(vertexShader);
-    } else {
-			var shaderProgram = gl.createProgram();
-			gl.attachShader(shaderProgram, vertexShader);
-			gl.attachShader(shaderProgram, fragmentShader);
-			gl.linkProgram(shaderProgram);
-			
-			if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
+function shader(char1, char2) {
+    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vertexShader, 1, char1, null);
+    gl.compileShader(vertexShader);
+
+    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, 1, char2, null);
+    gl.compileShader(fragmentShader);
+
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
+        throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);
+        gl.deleteShader(fragmentShader);
+    else
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
+            gl.deleteShader(vertexShader);
+        } else {
+            var shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
             } else {
-				gl.deleteShader(vertexShader);
-				gl.deleteShader(fragmentShader);
-				
-				id = shaderProgram;
-			}
-		}
-	}
+                gl.deleteShader(vertexShader);
+                gl.deleteShader(fragmentShader);
+
+                id = shaderProgram;
+            }
+        }
+    }
 }
 
-function textureBind()
-{
-	gl.bindTexture(gl.TEXTURE_2D, id);
+function textureBind() {
+    gl.bindTexture(gl.TEXTURE_2D, id);
 }
 
-function shaderSetFloat(name, value)
-{
-	gl.uniform1f(gl.getUniformLocation(id, name), value);
+function shaderSetFloat(name, value) {
+    gl.uniform1f(gl.getUniformLocation(id, name), value);
 }
 
-function shaderSetMat4(name, matrix)
-{
-	gl.uniformMatrix4fv(gl.getUniformLocation(id, name), 1, gl.FALSE, matrix);
+function shaderSetMat4(name, matrix) {
+    gl.uniformMatrix4fv(gl.getUniformLocation(id, name), 1, gl.FALSE, matrix);
 }
 
-function shaderSetVec3(name, vec)
-{
-	gl.uniform3f(gl.getUniformLocation(id, name), vec.x, vec.y, vec.z);
+function shaderSetVec3(name, vec) {
+    gl.uniform3f(gl.getUniformLocation(id, name), vec.x, vec.y, vec.z);
 }
 
-function setVec2(name, vec)
-{
-	gl.uniform2f(gl.getUniformLocation(id, name), vec.x, vec.y);
+function setVec2(name, vec) {
+    gl.uniform2f(gl.getUniformLocation(id, name), vec.x, vec.y);
 }
 
-function use()
-{
-	gl.useProgram(id);
+function use() {
+    gl.useProgram(id);
 }
 
-function loadRGBTex(path)
-{
-	
+function loadRGBTex(path) {
+
 }
 
-function textures(format, width, height, imag)
-{
-	gl.genTextures(1, id);
-	gl.bindTexture(gl.TEXTURE_2D, id);
-	gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, gl.UNSIGNED_BYTE, imag);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+function textures(format, width, height, imag) {
+    gl.genTextures(1, id);
+    gl.bindTexture(gl.TEXTURE_2D, id);
+    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, gl.UNSIGNED_BYTE, imag);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 }
 
 function shaders() {
     // define vertex shader in essl using es6 template strings
-	
-	var colorPrimVertexShader = `
+
+    var colorPrimVertexShader = `
 		layout (location = 0) in vec2 position;
 		uniform mat4 projection
 		
@@ -147,8 +166,8 @@ function shaders() {
 			gl_Position = projection * vec4(position, 0, 1);
 		}	
 	`
-	
-	var colorPrimFragmentShader = `
+
+    var colorPrimFragmentShader = `
 		uniform vec3 inColor;
 		out vec4 color;
 		
@@ -158,8 +177,8 @@ function shaders() {
 		}
 	
 	`
-	
-	var tileVertexShader = `
+
+    var tileVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -174,8 +193,8 @@ function shaders() {
 			texCoordFragment = texCoord;
 		}
 	`
-	
-	var tileFragmentShader = `
+
+    var tileFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -191,8 +210,8 @@ function shaders() {
 		}
 	
 	`
-	
-	var GlyphVertexShader = `
+
+    var GlyphVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -206,8 +225,8 @@ function shaders() {
 			texCoordFragment = texCoord;
 		}
 	`
-	
-	var GlyphFragmentShader = `
+
+    var GlyphFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -221,21 +240,21 @@ function shaders() {
 		}
 	
 	`
-	
-	var white = [1,1,1];
-	var black = [0,0,0];
-	
-  /**  var vShaderCode = `
-        attribute vec3 aVertexPosition; // vertex position
-        attribute vec3 aVertexNormal; // vertex normal
-		attribute vec3 aVertexColor;
-        
-        uniform mat4 umMatrix; // the model matrix
-        uniform mat4 upvmMatrix; // the project view model matrix
-        
-        varying vec3 vWorldPos; // interpolated world position of vertex
-        varying vec3 vVertexNormal; // interpolated normal for frag shader
-        void main(void) {
+
+    var white = [1, 1, 1];
+    var black = [0, 0, 0];
+
+    /**  var vShaderCode = `
+     attribute vec3 aVertexPosition; // vertex position
+     attribute vec3 aVertexNormal; // vertex normal
+     attribute vec3 aVertexColor;
+
+     uniform mat4 umMatrix; // the model matrix
+     uniform mat4 upvmMatrix; // the project view model matrix
+
+     varying vec3 vWorldPos; // interpolated world position of vertex
+     varying vec3 vVertexNormal; // interpolated normal for frag shader
+     void main(void) {
             
             // vertex position
             vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
@@ -245,31 +264,31 @@ function shaders() {
             vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
         }
-    `;
+     `;
 
-    // define fragment shader in essl using es6 template strings
-    var fShaderCode = `
-        precision mediump float; // set float to medium precision
-        // eye location
-        uniform vec3 uEyePosition; // the eye's position in world
-        
-        // light properties
-        uniform vec3 uLightAmbient; // the light's ambient color
-        uniform vec3 uLightDiffuse; // the light's diffuse color
-        uniform vec3 uLightSpecular; // the light's specular color
-        uniform vec3 uLightPosition; // the light's position
-        
-        // material properties
-        uniform vec3 uAmbient; // the ambient reflectivity
-        uniform vec3 uDiffuse; // the diffuse reflectivity
-        uniform vec3 uSpecular; // the specular reflectivity
-        uniform float uShininess; // the specular exponent
-        
-        // geometry properties
-        varying vec3 vWorldPos; // world xyz of fragment
-        varying vec3 vVertexNormal; // normal of fragment
-            
-        void main(void) {
+     // define fragment shader in essl using es6 template strings
+     var fShaderCode = `
+     precision mediump float; // set float to medium precision
+     // eye location
+     uniform vec3 uEyePosition; // the eye's position in world
+
+     // light properties
+     uniform vec3 uLightAmbient; // the light's ambient color
+     uniform vec3 uLightDiffuse; // the light's diffuse color
+     uniform vec3 uLightSpecular; // the light's specular color
+     uniform vec3 uLightPosition; // the light's position
+
+     // material properties
+     uniform vec3 uAmbient; // the ambient reflectivity
+     uniform vec3 uDiffuse; // the diffuse reflectivity
+     uniform vec3 uSpecular; // the specular reflectivity
+     uniform float uShininess; // the specular exponent
+
+     // geometry properties
+     varying vec3 vWorldPos; // world xyz of fragment
+     varying vec3 vVertexNormal; // normal of fragment
+
+     void main(void) {
         
             // ambient term
             vec3 ambient = uAmbient*uLightAmbient; 
@@ -290,9 +309,9 @@ function shaders() {
             vec3 colorOut = ambient + diffuse + specular; // no specular yet
             gl_FragColor = vec4(colorOut, 1.0); 
         }
-    `;
+     `;
 
-    try {
+     try {
         // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
         gl.shaderSource(fShader, fShaderCode); // attach code to shader
@@ -670,14 +689,14 @@ class gameGrid {
 }
 
 class Tetris {
-    static #linesToClearPerLevel_;
-    static #maxLevel_;
-    static #moveDelay_;
-    static #moveRepeatDelay_;
-    static #softDropSpeedFactor_;
-    static #lockDownTimeLimit_;
-    static #lockDownMovesLimit_;
-    static #pauseAfterLineClear_;
+    #linesToClearPerLevel_ = 10;
+    #maxLevel_ = 15;
+    #moveDelay_ = 0.05;
+    #moveRepeatDelay_ = 0.15;
+    #softDropSpeedFactor_ = 20;
+    #lockDownTimeLimit_ = 0.4;
+    #lockDownMovesLimit_ = 15;
+    #pauseAfterLineClear_ = 0.3;
 
 
     #gameGrid_;
@@ -724,7 +743,7 @@ class Tetris {
 
         for (let i = 0; i < 2; i++) {
             for (let type in TileType) {
-                if(type === TileType.NONE){
+                if (type === TileType.NONE) {
                     continue;
                 }
                 this.#bag_.push(type);
@@ -739,15 +758,63 @@ class Tetris {
     }
 
     checkLock() {
+        if (!this.#gameGrid_.isOnGround()) {
+            this.#isOnGround_ = false;
+            return;
+        }
+
+        this.#isOnGround_ = true;
+
+        if (this.#lockingTimer_ >= this.#lockDownTimeLimit_ || this.#nMovesWhileLocking_ >= this.#lockDownMovesLimit_)
+            this.lock();
     }
 
     lock() {
+        this.#lockingTimer_ = 0;
+        this.#isOnGround_ = false;
+        this.#canHold_ = true;
+
+        if (!this.#gameGrid_.checkGridOverflow()) {
+            this.#gameOver_ = true;
+            return;
+        }
+
+        if (this.#gameGrid_.numLinesToClear() == 0) {
+            this.spawnPiece();
+            return;
+        }
+
+        this.#pausedForLinesClear_ = true;
+        this.#linesClearTimer_ = 0;
     }
 
     spawnPiece() {
     }
 
     updateScore(linesCleared) {
+        let deltaScore = 0;
+        switch (linesCleared) {
+            case 1:
+                deltaScore = 100;
+                break;
+            case 2:
+                deltaScore = 300;
+                break;
+            case 3:
+                deltaScore = 400;
+                break;
+            case 4:
+                deltaScore = 800;
+                break;
+            default:
+                assert(false);
+        }
+        this.#linesCleared_ += linesCleared;
+        this.#score_ += deltaScore * level_;
+        if (this.#level_ < this.#maxLevel_ && this.#linesCleared_ >= #linesToClearPerLevel_ * this.#level_) {
+            this.#level_++;
+            this.#secondsPerLine_ = this.secondsPerLineForLevel(this.#level_);
+        }
     }
 
     const
@@ -774,16 +841,17 @@ class Tetris {
         this.#pausedForLinesClear_ = false;
         this.#linesClearTimer_ = 0;
 
-        shuffleArray(this.#bag_[0:NumPieces]);
+        //Shuffle array half and half
+        let tmp;
+        tmp = shuffleArray(this.#bag_.slice(0, NumPieces));
+        this.#bag_.splice(0, tmp.length, ...tmp);
+        tmp = shuffleArray(this.#bag_.slice(NumPieces, this.#bag_.length));
+        this.#bag_.splice(NumPieces, tmp.length, ...tmp);
 
+        let randomRange = NumPieces - 0;
+        this.#tileOnHold_ = this.#bag_[Math.round(Math.random() * randomRange)];
 
-        std::shuffle(bag_.begin(), bag_.begin() + kNumPieces, rng_);
-        std::shuffle(bag_.begin() + kNumPieces, bag_.end(), rng_);
-
-        std::uniform_int_distribution<int> holdPieceSelector(0, kNumPieces - 1);
-        this.#tileOnHold_ = this.#bag_[holdPieceSelector(this.#randomSeed_)];
-
-        spawnPiece();
+        this.spawnPiece();
     };
 
     isGameOver = () => this.#gameOver_;
@@ -795,40 +863,126 @@ class Tetris {
      * @param moveLeft Boolean
      */
     update(softDrop, moveRight, moveLeft) {
+        if (this.#pausedForLinesClear_) {
+            this.#linesClearTimer_ += this.#timePrecision_;
+
+            if (this.#linesClearTimer_ < this.#pauseAfterLineClear_)
+                return;
+
+            this.updateScore(this.#gameGrid_.numLinesToClear());
+            this.#gameGrid_.clearLines();
+            this.spawnPiece();
+            this.#pausedForLinesClear_ = false;
+        }
+
+        this.#moveDownTimer_ += this.#timePrecision_;
+        this.#moveRepeatTimer_ += this.#timePrecision_;
+        this.#moveRepeatDelayTimer_ += this.#timePrecision_;
+
+        if (this.#isOnGround_)
+            this.#lockingTimer_ += this.#timePrecision_;
+        else
+            this.#lockingTimer_ = 0;
+
+        let moveLeftInput = moveLeft;
+        let moveRightInput = moveRight;
+
+        if (moveLeft && moveRight) {
+            if (!moveRightPrev_)
+                moveLeft = false;
+            else if (!moveLeftPrev_)
+                moveRight = false;
+            else if (motion_ == Motion::kLeft)
+                moveRight = false;
+            else
+                moveLeft = false;
+        }
+
+        if (moveRight) {
+            if (motion_ != Motion::kRight) {
+                this.#moveRepeatDelayTimer_ = 0;
+                this.#moveRepeatTimer_ = 0;
+                this.moveHorizontal(1);
+            } else if (this.#moveRepeatDelayTimer_ >= this.#moveRepeatDelay_ && this.#moveRepeatTimer_ >= this.#moveDelay_) {
+                this.#moveRepeatTimer_ = 0;
+                moveHorizontal(1);
+            }
+            this.#motion_ = Motion::kRight;
+        } else if (moveLeft) {
+            if (motion_ != Motion::kLeft) {
+                this.#moveRepeatDelayTimer_ = 0;
+                this.#moveRepeatTimer_ = 0;
+                this.moveHorizontal(-1);
+            } else if (this.#moveRepeatDelayTimer_ >= this.#moveRepeatDelay_ && this.#moveRepeatTimer_ >= this.#moveDelay_) {
+                this.#moveRepeatTimer_ = 0;
+                this.moveHorizontal(-1);
+            }
+            this.#motion_ = Motion.LEFT;
+        } else {
+            this.#motion_ = Motion.NONE;
+        }
+
+        this.#moveLeftPrev_ = moveLeftInput;
+        this.#moveRightPrev_ = moveRightInput;
+
+        let speedFactor = softDrop ? this.#softDropSpeedFactor_ : 1;
+        if (this.#moveDownTimer_ >= this.#secondsPerLine_ / speedFactor) {
+            if (this.#gameGrid_.moveVertical(1) && softDrop)
+                this.#score_ += this.#level_;
+            this.#moveDownTimer_ = 0;
+        }
+
+        this.checkLock();
     }
 
     rotate(rotation) {
+
+        if (this.#gameGrid_.rotate(rotation) && this.#isOnGround_) {
+            this.#lockingTimer_ = 0;
+            this.#nMovesWhileLocking_++;
+        }
+
+        this.checkLock();
+
     }
 
     hardDrop() {
+        if (this.#gameGrid_.tileType() === TileType.NONE)
+            return;
+        this.#score_ += 2 * this.#level_ * this.#gameGrid_.hardDrop();
+        this.lock();
     }
 
     hold() {
+        if (!this.#canHold_ || this.#pausedForLinesClear_)
+            return;
+
+        let curTile = this.#gameGrid_.tileType()   //tile().kind();
+        this.#gameGrid_.spawnPiece(this.#tileOnHold_);
+        this.#heldPiece_ = curTile;
+
+        this.#canHold_ = false;
     }
 
-    const
+
     lockPercent = () => this.#lockingTimer_ / this.#lockDownTimeLimit_;
 
-    const
+
     isPausedForLinesClear = () => this.#pausedForLinesClear_;
 
 
-    const
     linesClearPausePercent = () => this.#linesClearTimer_ / this.#pauseAfterLineClear_;
 
-    const
+
     level = () => this.#level_;
 
-    const
     score = () => this.#score_;
 
-    const
     linesCleared = () => this.#linesCleared_;
 
-    const
     nextPiece = () => new Tile(this.#bag_[this.#nextTile_]);
 
-    const
+
     heldPiece = () => new Tile(this.#tileOnHold_);
 
 
@@ -1351,8 +1505,7 @@ function oneByFour() {
         }
     }
 
-    this.positonRotate = function()
-    {
+    this.positonRotate = function () {
         var position1 = null;
         var position2 = null;
 
@@ -1461,7 +1614,7 @@ function main() {
 
     setupWebGL(); // set up the webGL environment
     shaders(); //sets up shaders
-	shader();
-   // game();
+    shader();
+    // game();
 
 }
