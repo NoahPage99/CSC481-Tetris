@@ -23,6 +23,7 @@ var clockwise = false;
 var counterclock = false;
 var rotating = false;
 var falling = false;
+var mainBuffer;
 
 //Enumerate
 const TileType = {NONE: -1, I: 0, J: 1, L: 2, O: 3, S: 4, T: 5, Z: 6, GARBAGE: 7};
@@ -244,15 +245,67 @@ function shaders() {
 
     var white = [1, 1, 1];
     var black = [0, 0, 0];
+	
+	function spriteRenderer(projection)
+	{
+		var vertices = [0,0,0,1,0,1,0,0,1,0,1,1,1,1,1,0];
+	
+		var buffer;
+	
+		gl.genBuffer(1, buffer);
+		gl.genVertexArrays(1, mainBuffer);
+		gl.bindVertexArray(mainBuffer);
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+		gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+		gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
+		gl.enableVertexAttribArray(0);
+		gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
+		gl.enableVertexAttribArray(1);
+		gl.bindVertexArray(0);
+		
+		use();
+		shaderSetMat4("projection", projection);
+		
+	}
+	
+	function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier)
+	{
+		textureBind();
+		use();
+		
+		var v = Vec2(x, y);
+		var v1 = Vec2(width, height);
+		
+		setVec2("shift", v);
+		setVec2("scale", v1);
+		
+		shaderSetFloat("mixC", mixC);
+		shaderSetVec3("mixColor", mixColor);
+		shaderSetFloat("alphaMultiplier", alphaMultiplier);
+		gl.bindVertexArray(mainBuffer);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+		
+	}
+	
+	function PieceRenderShape(piece, c, y, mixC, mixColor, alphaMultiplier, startRow)
+	{
+		
+		//unsure on piece.
+		
+		/**if(piece.kind() == NONE)
+		{
+			return;
+		}
+		var texture = */
+	}
+	
 
     /**  var vShaderCode = `
      attribute vec3 aVertexPosition; // vertex position
      attribute vec3 aVertexNormal; // vertex normal
      attribute vec3 aVertexColor;
-
      uniform mat4 umMatrix; // the model matrix
      uniform mat4 upvmMatrix; // the project view model matrix
-
      varying vec3 vWorldPos; // interpolated world position of vertex
      varying vec3 vVertexNormal; // interpolated normal for frag shader
      void main(void) {
@@ -266,29 +319,24 @@ function shaders() {
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
         }
      `;
-
      // define fragment shader in essl using es6 template strings
      var fShaderCode = `
      precision mediump float; // set float to medium precision
      // eye location
      uniform vec3 uEyePosition; // the eye's position in world
-
      // light properties
      uniform vec3 uLightAmbient; // the light's ambient color
      uniform vec3 uLightDiffuse; // the light's diffuse color
      uniform vec3 uLightSpecular; // the light's specular color
      uniform vec3 uLightPosition; // the light's position
-
      // material properties
      uniform vec3 uAmbient; // the ambient reflectivity
      uniform vec3 uDiffuse; // the diffuse reflectivity
      uniform vec3 uSpecular; // the specular reflectivity
      uniform float uShininess; // the specular exponent
-
      // geometry properties
      varying vec3 vWorldPos; // world xyz of fragment
      varying vec3 vVertexNormal; // normal of fragment
-
      void main(void) {
         
             // ambient term
@@ -311,18 +359,15 @@ function shaders() {
             gl_FragColor = vec4(colorOut, 1.0); 
         }
      `;
-
      try {
         // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
         gl.shaderSource(fShader, fShaderCode); // attach code to shader
         gl.compileShader(fShader); // compile the code for gpu execution
-
         // console.log("vertex shader: "+vShaderCode);
         var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
         gl.shaderSource(vShader, vShaderCode); // attach code to shader
         gl.compileShader(vShader); // compile the code for gpu execution
-
         if (!gl.getShaderParameter(fShader, gl.COMPILE_STATUS)) { // bad frag shader compile
             throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);
             gl.deleteShader(fShader);
@@ -334,7 +379,6 @@ function shaders() {
             gl.attachShader(shaderProgram, fShader); // put frag shader in program
             gl.attachShader(shaderProgram, vShader); // put vertex shader in program
             gl.linkProgram(shaderProgram); // link program into gl context
-
             if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
             } else { // no shader program link errors
@@ -343,7 +387,6 @@ function shaders() {
                 gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
                 //shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
                 //gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
-
                 shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
                 shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
             }
