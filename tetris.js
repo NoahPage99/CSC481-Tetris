@@ -32,6 +32,7 @@ const TileColor = {NONE: -1, CYAN: 0, BLUE: 1, ORANGE: 2, YELLOW: 3, GREEN: 4, P
 const Rotation = {NONE: -1, CLOCKWISE: 90, COUNTERCLOCKWISE: -90};
 const Motion = {NONE: -1, LEFT: 0, RIGHT: 1};
 const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
+const KeyAction = {PRESS: 0, RELEASE: 1};
 let CurGameState = GameState.Start;
 const NumStates = 4;
 const NumPieces = 7;
@@ -57,12 +58,21 @@ const BoardY = Margin;
 const HudPieceBoxHeight = 2.5 * TileSize;
 const FontSize = 18;
 
+let lockedTextures = [];
+let ghostTextures = [];
+let normalTextures = [];
+
 const GameTimePrecision = 0.005;
 const Fps = 30;
 const SecondsPerFrame = 1.0 / Fps;
 
 
 function setupWebGL() {
+
+    // document.onkeydown = handleKey();
+
+    document.addEventListener('keydown', handleKey(event, KeyAction.PRESS));
+    document.addEventListener('keyup', handleKey(event, KeyAction.RELEASE));
 
     // Get the canvas and context
     var canvas = document.getElementById("myWebGLCanvas"); // create a js canvas
@@ -85,37 +95,37 @@ function setupWebGL() {
 
 } // end setupWebGL
 
-function shader(char1, char2) {
+function shader(sourceVertex, sourceFragment) {
     var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, 1, char1, null);
+    gl.shaderSource(vertexShader, 1, sourceVertex, null);
     gl.compileShader(vertexShader);
 
     var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, 1, char2, null);
+    gl.shaderSource(fragmentShader, 1, sourceFragment, null);
     gl.compileShader(fragmentShader);
 
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
         throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);
         gl.deleteShader(fragmentShader);
-    }else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
-            gl.deleteShader(vertexShader);
+    } else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+        throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
+        gl.deleteShader(vertexShader);
+    } else {
+        var shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
+            throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
         } else {
-            var shaderProgram = gl.createProgram();
-            gl.attachShader(shaderProgram, vertexShader);
-            gl.attachShader(shaderProgram, fragmentShader);
-            gl.linkProgram(shaderProgram);
+            gl.deleteShader(vertexShader);
+            gl.deleteShader(fragmentShader);
 
-            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
-                throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
-            } else {
-                gl.deleteShader(vertexShader);
-                gl.deleteShader(fragmentShader);
-
-                id = shaderProgram;
-            }
+            id = shaderProgram;
         }
-    
+    }
+
 }
 
 function textureBind() {
@@ -245,234 +255,207 @@ function shaders() {
 
     var white = [1, 1, 1];
     var black = [0, 0, 0];
-	
-	function spriteRenderer(projection)
-	{
-		var vertices = [0,0,0,1,0,1,0,0,1,0,1,1,1,1,1,0];
-	
-		var buffer;
-	
-		gl.genBuffer(1, buffer);
-		gl.genVertexArrays(1, mainBuffer);
-		gl.bindVertexArray(mainBuffer);
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-		gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-		gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
-		gl.enableVertexAttribArray(0);
-		gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
-		gl.enableVertexAttribArray(1);
-		gl.bindVertexArray(0);
-		
-		use();
-		shaderSetMat4("projection", projection);
-		
-	}
-	
-	function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier)
-	{
-		textureBind();
-		use();
-		
-		var v = vec2.fromValues(x, y);
-		var v1 = vec2.fromValues(width, height);
-		
-		setVec2("shift", v);
-		setVec2("scale", v1);
-		
-		shaderSetFloat("mixC", mixC);
-		shaderSetVec3("mixColor", mixColor);
-		shaderSetFloat("alphaMultiplier", alphaMultiplier);
-		gl.bindVertexArray(mainBuffer);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-		
-	}
-	
-	function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow)
-	{
-		
-		//unsure on piece.
-		
-		if(piece.kind() == NONE)
-		{
-			return;
-		}
-		var texture = piece.color();
-		
-		var i = startRow * piece.boxSide();
-		var shape = piece.shape();
-		for(var row = startRow; row < piece.boxSide(); row++)
-		{
-			for(var col = 0; col < piece.boxSide(); col++)
-			{
-				if(shape[i] != empty)
-				{
-					spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize, mixC, mixColor, alphaMultiplier);
-					i++;
-				}
-			}
-		}
-	}
-	
-	function pieceRenderInitialShape(piece, x, y)
-	{
-		
-		//unsure on piece.
-		
-		if(piece.kind() == NONE)
-		{
-			return;
-		}
-		var texture = piece.color();
-		
-		var i = 0;
-		var shape = piece.initialShape();
-		for(var row = 0; row < piece.nRow(); row++)
-		{
-			for(var col = 0; col < piece.nCols(); col++)
-			{
-				if(shape[i] != empty)
-				{
-					spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize);
-					i++;
-				}
-			}
-		}
-	}
-	
-	function renderShapedCentered(piece, x, y, width, height)
-	{
-		var pieceWidth = tileSize * piece.nCols();
-		var pieceHeight = tileSize * piece.nRow();
-		var xShift = .5 * (width - pieceWidth);
-		var yShift = .5 * (height - pieceHeight);
-		
-		pieceRenderInitialShape(piece, x + xShift, y + yShift);
-	}
-	
-	var background = vec3.fromValues(.05, .05, .05);
-	var gridColor = vec3.fromValues(.2, .2, .2);
-	
-	function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render)
-	{
-		use();
-		shaderSetMat4("projection", projection);
-		
-		var width = rows * tileSize;
-		var height = cols * tileSize;
-		
-		var vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
-		
-		var yGrid = y;
-		
-		for(var row = 0; row < rows + 1; ++row)
-		{
-			vertBack.push(x);
-			vertBack.push(yGrid);
-			vertBack.push(x + width);
-			vertBack.push(yGrid);
-			yGrid += tileSize;
-		}
-		
-		var xGrid = x;
-		
-		for(var col = 0; col < cols + 1; ++col)
-		{
-			vertBack.push(xGrid);
-			vertBack.push(y);
-			vertBack.push(xGrid);
-			vertBack.push(y + height);
-			xGrid += tileSize;
-		}
-		
-		var buffer;
-		gl.genBuffer(1, buffer);
-		gl.genVertexArrays(1, mainBuffer2);
-		gl.bindVertexArray(mainBuffer2);
-		
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-		gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertback, gl.STATIC_DRAW);
-		gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, gl.FLOAT * 2, 0);
-		gl.enableVertexAttribArray(0);
-		gl.bindVertexArray(0);
-	}
-	
-	function renderBackground()
-	{
-		use();
-		gl.bindVertexArray(mainBuffer2);
-		shaderSetVec3("inColor", backgroundColor);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-		shaderSetVec3("inColor", gridColor);
-		gl.drawArrays(gl.LINES, 4, 2 *(nRows_ + nCols_ + 2));
-	}
-	
-	function renderTiles(board, alphaMultiplier)
-	{
-		var row;
-		var col;
-		var x;
-		var y;
-		var yy = y_;
-		var xx = x_;
-		
-		for( var row = 0, y = yy; row < board.nRow; row++, y += tileSize)
-		{
-			for( var col = 0, x = xx; col < board.nCols; col++, x += tileSize)
-			{
-				var tile = board.tileAt(row, col);
-				if(tile == empty)
-				{
-					continue;
-				}
-				spriteRender(tile, x, y, tileSize, tileSize, 0, 0, alphaMultiplier);
-			}
-		}
-		
-	}
-	
-	function renderPiece(piece, row, col, lock, alphaMultiplier)
-	{
-		var startRow = Math.max(0, -row);
-		var mixC = .5 * Math.sin((Math.PI/2) * lock);
-		PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
-	}
-	
-	/**function renderGhost(piece, gRow, col)
-	{
+
+    function spriteRenderer(projection) {
+        var vertices = [0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0];
+
+        var buffer;
+
+        gl.genBuffer(1, buffer);
+        gl.genVertexArrays(1, mainBuffer);
+        gl.bindVertexArray(mainBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
+        gl.enableVertexAttribArray(1);
+        gl.bindVertexArray(0);
+
+        use();
+        shaderSetMat4("projection", projection);
+
+    }
+
+    function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier) {
+        textureBind();
+        use();
+
+        var v = vec2.fromValues(x, y);
+        var v1 = vec2.fromValues(width, height);
+
+        setVec2("shift", v);
+        setVec2("scale", v1);
+
+        shaderSetFloat("mixC", mixC);
+        shaderSetVec3("mixColor", mixColor);
+        shaderSetFloat("alphaMultiplier", alphaMultiplier);
+        gl.bindVertexArray(mainBuffer);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    }
+
+    function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow) {
+
+        //unsure on piece.
+
+        if (piece.kind() == NONE) {
+            return;
+        }
+        var texture = piece.color();
+
+        var i = startRow * piece.boxSide();
+        var shape = piece.shape();
+        for (var row = startRow; row < piece.boxSide(); row++) {
+            for (var col = 0; col < piece.boxSide(); col++) {
+                if (shape[i] != empty) {
+                    spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize, mixC, mixColor, alphaMultiplier);
+                    i++;
+                }
+            }
+        }
+    }
+
+    function pieceRenderInitialShape(piece, x, y) {
+
+        //unsure on piece.
+
+        if (piece.kind() == NONE) {
+            return;
+        }
+        var texture = piece.color();
+
+        var i = 0;
+        var shape = piece.initialShape();
+        for (var row = 0; row < piece.nRow(); row++) {
+            for (var col = 0; col < piece.nCols(); col++) {
+                if (shape[i] != empty) {
+                    spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize);
+                    i++;
+                }
+            }
+        }
+    }
+
+    function renderShapedCentered(piece, x, y, width, height) {
+        var pieceWidth = tileSize * piece.nCols();
+        var pieceHeight = tileSize * piece.nRow();
+        var xShift = .5 * (width - pieceWidth);
+        var yShift = .5 * (height - pieceHeight);
+
+        pieceRenderInitialShape(piece, x + xShift, y + yShift);
+    }
+
+    var background = vec3.fromValues(.05, .05, .05);
+    var gridColor = vec3.fromValues(.2, .2, .2);
+
+    function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render) {
+        use();
+        shaderSetMat4("projection", projection);
+
+        var width = rows * tileSize;
+        var height = cols * tileSize;
+
+        var vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
+
+        var yGrid = y;
+
+        for (var row = 0; row < rows + 1; ++row) {
+            vertBack.push(x);
+            vertBack.push(yGrid);
+            vertBack.push(x + width);
+            vertBack.push(yGrid);
+            yGrid += tileSize;
+        }
+
+        var xGrid = x;
+
+        for (var col = 0; col < cols + 1; ++col) {
+            vertBack.push(xGrid);
+            vertBack.push(y);
+            vertBack.push(xGrid);
+            vertBack.push(y + height);
+            xGrid += tileSize;
+        }
+
+        var buffer;
+        gl.genBuffer(1, buffer);
+        gl.genVertexArrays(1, mainBuffer2);
+        gl.bindVertexArray(mainBuffer2);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertback, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, gl.FLOAT * 2, 0);
+        gl.enableVertexAttribArray(0);
+        gl.bindVertexArray(0);
+    }
+
+    function renderBackground() {
+        use();
+        gl.bindVertexArray(mainBuffer2);
+        shaderSetVec3("inColor", backgroundColor);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        shaderSetVec3("inColor", gridColor);
+        gl.drawArrays(gl.LINES, 4, 2 * (nRows_ + nCols_ + 2));
+    }
+
+    function renderTiles(board, alphaMultiplier) {
+        var row;
+        var col;
+        var x;
+        var y;
+        var yy = y_;
+        var xx = x_;
+
+        for (var row = 0, y = yy; row < board.nRow; row++, y += tileSize) {
+            for (var col = 0, x = xx; col < board.nCols; col++, x += tileSize) {
+                var tile = board.tileAt(row, col);
+                if (tile == empty) {
+                    continue;
+                }
+                spriteRender(tile, x, y, tileSize, tileSize, 0, 0, alphaMultiplier);
+            }
+        }
+
+    }
+
+    function renderPiece(piece, row, col, lock, alphaMultiplier) {
+        var startRow = Math.max(0, -row);
+        var mixC = .5 * Math.sin((Math.PI / 2) * lock);
+        PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
+    }
+
+    /**function renderGhost(piece, gRow, col)
+     {
 		var startRow = Math.max(0, -gRow);
 		
 	}*/
-	
-	function clearLinesAnimation(board, percent)
-	{
-		var t = .3;
-		var mixColor;
-		var mixC;
-		
-		if(percent < t)
-		{
-			var sin = Math.sin(Math.PI * percent / t);
-			mixColor = white;
-			mixC = .8 * sin;
-		}
-		else 
-		{
-			mixColor = black;
-			mixC = (percent - t) / (1 - t);
-		}
-		for(var row : board.linesToClear_())
-		{
-			for(var col = 0; col < nCols_; col++)
-			{
-				var x = x_ + col * tileSize;
-				var y = y_ + row * tileSize;
-				spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
-			}
-		}
-		
-	}
-	
-	
+
+    function clearLinesAnimation(board, percent) {
+        var t = .3;
+        var mixColor;
+        var mixC;
+
+        if (percent < t) {
+            var sin = Math.sin(Math.PI * percent / t);
+            mixColor = white;
+            mixC = .8 * sin;
+        } else {
+            mixColor = black;
+            mixC = (percent - t) / (1 - t);
+        }
+        for (var row: board.linesToClear_()
+    )
+        {
+            for (var col = 0; col < nCols_; col++) {
+                var x = x_ + col * tileSize;
+                var y = y_ + row * tileSize;
+                spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
+            }
+        }
+
+    }
+
 
     /**  var vShaderCode = `
      attribute vec3 aVertexPosition; // vertex position
@@ -723,7 +706,7 @@ class gameGrid {
      * @param direct Clockwise > 0, CounterClockwise < 0
      * @returns {boolean}
      */
-    rotate(rotation, direct) {
+    rotate(rotation) {
         if (this.#tile_.tileType == TileType.O || this.#tile_.tileType == TileType.NONE)
             return false;
 
@@ -804,7 +787,6 @@ class gameGrid {
      *
      * @returns {*}
      */
-    const
     ghostRow = () => this.#ghostRow_;
 
 //Private method
@@ -958,7 +940,7 @@ class Tetris {
 
         for (let i = 0; i < 2; i++) {
             for (let type in TileType) {
-                if (type === TileType.NONE) {
+                if (type == TileType.NONE) {
                     continue;
                 }
                 this.#bag_.push(type);
@@ -1041,7 +1023,6 @@ class Tetris {
         }
     }
 
-    const
     secondsPerLineForLevel = (level) => Math.pow(0.8 - (level - 1) * 0.007, level - 1);
 
     //Public methods
@@ -1123,17 +1104,17 @@ class Tetris {
         }
 
         if (moveRight) {
-            if (this.#motion_ != Motion.Right) {
+            if (this.#motion_ != Motion.RIGHT) {
                 this.#moveRepeatDelayTimer_ = 0;
                 this.#moveRepeatTimer_ = 0;
                 this.moveHorizontal(1);
             } else if (this.#moveRepeatDelayTimer_ >= this.#moveRepeatDelay_ && this.#moveRepeatTimer_ >= this.#moveDelay_) {
                 this.#moveRepeatTimer_ = 0;
-                THIS.moveHorizontal(1);
+                this.moveHorizontal(1);
             }
-            this.#motion_ = Motion::kRight;
+            this.#motion_ = Motion.RIGHT;
         } else if (moveLeft) {
-            if (motion_ != Motion::kLeft) {
+            if (this.#motion_ != Motion.LEFT) {
                 this.#moveRepeatDelayTimer_ = 0;
                 this.#moveRepeatTimer_ = 0;
                 this.moveHorizontal(-1);
@@ -1159,6 +1140,14 @@ class Tetris {
         this.checkLock();
     }
 
+    moveHorizontal(dCol) {
+        if (this.#gameGrid_.moveHorizontal(dCol) && this.#isOnGround_) {
+            this.#lockingTimer_ = 0;
+            this.#nMovesWhileLocking_ += 1;
+        }
+    }
+
+
     rotate(rotation) {
 
         if (this.#gameGrid_.rotate(rotation) && this.#isOnGround_) {
@@ -1171,7 +1160,7 @@ class Tetris {
     }
 
     hardDrop() {
-        if (this.#gameGrid_.tileType() === TileType.NONE)
+        if (this.#gameGrid_.tileType() == TileType.NONE)
             return;
         this.#score_ += 2 * this.#level_ * this.#gameGrid_.hardDrop();
         this.lock();
@@ -1281,11 +1270,46 @@ class Tile {
     shape = () => this.#shape_;
 
     rotate(rotation) {
+        if (this.#tileType_ == TileType.O)
+            return;
+
+        let newShape = new Array(this.#shape_.length);
+        let index = 0;
+        switch (rotation) {
+            case Rotation.RIGHT:
+                this.#state_ += 1;
+                for (let col = this.#bBoxSide_ - 1; col >= 0; --col) {
+                    for (let row = 0; row < this.#bBoxSide_; ++row) {
+                        newShape[row * this.#bBoxSide_ + col] = this.#shape_[index];
+                        ++index;
+                    }
+                }
+                break;
+            case Rotation.COUNTERCLOCKWISE:
+                this.#state_ -= 1;
+                for (let col = 0; col < this.#bBoxSide_; ++col) {
+                    for (let i = this.#bBoxSide_ - 1; i >= 0; --i) {
+                        newShape[i * this.#bBoxSide_ + col] = this.#shape_[index];
+                        ++index;
+                    }
+                }
+        }
+        this.#shape_ = newShape;
+
+        if (this.#state_ == -1)
+            this.#state_ = NumStates_ - 1;
+        else if (this.#state_ == NumStates_)
+            this.#state_ = 0;
 
     }
 
     kicks(rotation) {
-
+        switch (rotation) {
+            case Rotation.CLOCKWISE:
+                return this.#kicksRight_[this.#state_];
+            case Rotation.COUNTERCLOCKWISE:
+                return this.#kicksLeft_[this.#state_];
+        }
     }
 
 }
@@ -1789,6 +1813,36 @@ function tetrimon() {
     }
 }
 
+// Reference https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
+function loadTexture(img_url) {
+    var img_path = img_url;
+    var Texture = gl.createTexture();
+    Texture.image = new Image();
+    Texture.image.onload = function () {
+        const level = 0;
+        const internalFormat = gl.RGBA;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
+        gl.bindTexture(gl.TEXTURE_2D, Texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, Texture.image);
+        if (isPowerOf2(Texture.image.width) && isPowerOf2(Texture.image.height)) {
+            gl.generateMipmap(gl.TEXTURE_2D);
+        } else {
+            // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    };
+    Texture.image.crossOrigin = "Anonymous";
+    Texture.image.src = img_path;
+    return Texture;
+}
+
+
 function game() {
     r = Math.random();
     g = Math.random();
@@ -1798,50 +1852,112 @@ function game() {
     g2 = g + .4;
     b2 = b + .4;
 
-    grid = new gameGrid();
-
     tetrimon();
 
     current.object();
 
-
-    // tetri = new Tetris(, GameTimePrecision)
 }
 
-function handleKey(event) {
+function initialGame(){
+    let sauce = getJSONFile(" https://github.ncsu.edu/ncpage/CSC481-Tetris/blob/master/resource/officialTexture.json", officialTextureSource);
+
+    for (let key in TileType) {
+        if (TileType[key] == -1)
+            continue;
+        lockedTextures[TileType[key]] = loadTexture(sauce.locked[TileType[key]]);
+        ghostTextures[TileType[key]] = loadTexture(sauce.ghost[TileType[key]]);
+        normalTextures[TileType[key]]= loadTexture(sauce.normal[TileType[key]]);
+    }
+
+    grid = new gameGrid(GridNumRows, GridNumCols);
+    tetri = new Tetris(grid, GameTimePrecision)
+}
+
+function render(){
+
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.enable(gl.BLEND);
+
+    let projection = mat4.create();
+
+
+}
+
+
+function handleKey(event, action) {
 // The key are same as official Tetris'
-    switch (event.code) {
-        case "Space": //Hard drop
-			hardDrop();
-            break;
-        case "ArrowRight": // Move right
-			moveRight = true;
-            break;
-        case "ArrowLeft": // Move left
-			moveLeft = true;
-            break;
-        case "ArrowUp": // Rotate right
-		
-            break;
-        case "ArrowDown": // Soft drop
-			softDrop = true;
-            break;
-        case "KeyZ": //Rotate left
-			
-        case "KeyC": //Hold
-			
-            break;
-        case"Escape": //Pause the game
-			GameState = Paused;
-            break;
+    if (CurGameState == GameState.Run) {
+        if (action == KeyAction.PRESS) {
+
+            switch (event.code) {
+                case "Space": //Hard drop
+                    tetri.hardDrop();
+                    break;
+                case "ArrowRight": // Move right
+                    moveRight = true;
+                    break;
+                case "ArrowLeft": // Move left
+                    moveLeft = true;
+                    break;
+                case "ArrowUp": // Rotate right
+                    tetri.rotate(Rotation.CLOCKWISE);
+                    break;
+                case "ArrowDown": // Soft drop
+                    softDrop = true;
+                    break;
+                case "KeyZ": //Rotate left
+                    tetri.rotate(Rotation.COUNTERCLOCKWISE);
+                case "KeyC": //Hold
+                    tetri.hold();
+                    break;
+                case"Escape": //Pause the game
+                    CurGameState = GameState.Paused;
+                    break;
+            }
+
+        } else if (action == KeyAction.RELEASE) {
+            switch (event.code) {
+                case "ArrowRight": // Move right
+                    moveRight = false;
+                    break;
+                case "ArrowLeft": // Move left
+                    moveLeft = false;
+                    break;
+                case "ArrowDown": // Soft drop
+                    softDrop = false;
+                    break;
+            }
+        } else if (CurGameState == GameState.Paused) {
+            if (event.code == "Escape" && action == KeyAction.PRESS)
+                CurGameState = GameState.Run;
+            else if (event.code == "Enter" && action == KeyAction.PRESS)
+                CurGameState = GameState.Start;
+        } else if (CurGameState == GameState.Start) {
+            if (event.code == "Enter" && action == KeyAction.PRESS) {
+                moveRight = false;
+                moveLeft = false;
+                softDrop = false;
+                tetri.restart(startLevel);
+                CurGameState = GameState.Run;
+            } else if (event.code == "ArrowUp" && action == KeyAction.PRESS) {
+                startLevel = Math.min(15, startLevel + 1);
+            } else if (event.code == "ArrowDown" && action == KeyAction.PRESS) {
+                startLevel = Math.max(1, startLevel - 1);
+            }
+        } else if (CurGameState == GameState.End) {
+            if (event.code == "Enter" && action == KeyAction.PRESS)
+                CurGameState = GameState.Start;
+        }
     }
 }
 
+
 function main() {
 
+    initialGame();
     setupWebGL(); // set up the webGL environment
     shaders(); //sets up shaders
     shader();
-    // game();
+    render();
 
 }
