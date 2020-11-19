@@ -2278,7 +2278,7 @@ function game() {
 }
 
 function initialGame() {
-    let sauce = getJSONFile(" http://localhost/resource/officialTexture.json", "officialTextureSource");
+    let sauce = getJSONFile(" resource/officialTexture.json", "officialTextureSource");
 
     for (let key in TileType) {
         if (TileType[key] == -1)
@@ -2501,9 +2501,9 @@ function handleKey(event, action) {
 
 
 function main() {
-
+    setupWebGL();
     initialGame();
-    setupWebGL(); // set up the webGL environment
+    // set up the webGL environment
     // shaders(); //sets up shaders
     // shader();
     render();
