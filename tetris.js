@@ -108,6 +108,8 @@ class shader {
     #id_ = null;
 
     constructor(sourceVertex, sourceFragment) {
+
+
         let vertexShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vertexShader, 1, sourceVertex, null);
         gl.compileShader(vertexShader);
@@ -134,7 +136,7 @@ class shader {
                 gl.deleteShader(vertexShader);
                 gl.deleteShader(fragmentShader);
 
-                this.#id = shaderProgram;
+                this.#id_ = shaderProgram;
             }
         }
 
@@ -199,12 +201,12 @@ class SpriteRenderer {
     render(texture, x, y, width, height, mixCoeff, mixColor, alphaMultiplier) {
         texture.bind();
         this.#shader_.use();
-        this.#shader_.setVec2("shift", glm::vec2(x, y));
-        this.#shader_.setVec2("scale", glm::vec2(width, height));
+        this.#shader_.setVec2("shift", vec2.fromValues(x,y));
+        this.#shader_.setVec2("scale",  vec2.fromValues(width, height));
         this.#shader_.setFloat("mixCoeff", mixCoeff);
         this.#shader_.setVec3("mixColor", mixColor);
         this.#shader_.setFloat("alphaMultiplier", alphaMultiplier);
-        gl.bindVertexArray(vao_);
+        gl.bindVertexArray(this.#vao_);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 }
@@ -255,7 +257,7 @@ class TileRenderer {
         for (var row = 0; row < piece.nRow(); row++) {
             for (var col = 0; col < piece.nCol(); col++) {
                 if (shape[i] != empty) {
-                    spriteRender(texture, x + col * this.#tileSize_, y + row * this.#tileSize_, this.#tileSize_e, this.#tileSize_);
+                    spriteRender(texture, x + col * this.#tileSize_, y + row * this.#tileSize_, this.#tileSize_, this.#tileSize_);
                     i++;
                 }
             }
@@ -1069,7 +1071,7 @@ class gameGrid {
     generateTile(typeOfTile) {
         this.#tile_ = new Tile(typeOfTile);
         this.#row_ = -2;
-        this.#col = (this.#nCols_ - this.#tile_.bBoxSide()) / 2;
+        this.#col_= (this.#nCols_ - this.#tile_.bBoxSide()) / 2;
 
         if (!this.checkPosition(this.#row_, this.#col_, this.#tile_))
             return false;
@@ -1133,7 +1135,7 @@ class gameGrid {
             let row = kick[0];
             let col = kick[1]
             if (this.checkPosition(this.#row_ + row, this.#col_ + col, testPiece)) {
-                this.#tile__ = testPiece;
+                this.#tile_ = testPiece;
                 this.#row_ += row;
                 this.#col_ += col;
                 this.updateGhostRow();
@@ -1300,7 +1302,7 @@ class gameGrid {
     }
 
     setTile(row, col, color) {
-        this.#tiles_[(row + this.rowsAbove_) * this.#nCols_s + col] = color;
+        this.#tiles_[(row + this.rowsAbove_) * this.#nCols_ + col] = color;
     }
 }
 
@@ -1348,7 +1350,7 @@ class Tetris {
     #linesClearTimer_;
 
     constructor(gameGrid, timePrecision) {
-        this.#gameGrid = gameGrid;
+        this.#gameGrid_ = gameGrid;
         this.#timePrecision_ = timePrecision;
         this.#bag_ = new Array(2 * NumPieces);
         this.#nextTile_ = new Tile(TileType.NONE);
@@ -1405,7 +1407,7 @@ class Tetris {
 
             let tmp = this.#bag_.slice(NumPieces, this.#bag_.length);
             this.#bag_.splice(0, tmp.length, ...tmp);
-            this.#bag = shuffleArray(this.#bag);
+            this.#bag_ = shuffleArray(this.#bag_);
 
 
             this.#nextTile_ = 0;
@@ -1588,7 +1590,7 @@ class Tetris {
 
         let curTile = this.#gameGrid_.tileType()   //tile().kind();
         this.#gameGrid_.spawnPiece(this.#tileOnHold_);
-        this.#heldPiece_ = curTile;
+        this.#tileOnHold_ = curTile;
 
         this.#canHold_ = false;
     }
@@ -2276,7 +2278,7 @@ function game() {
 }
 
 function initialGame() {
-    let sauce = getJSONFile(" https://github.ncsu.edu/ncpage/CSC481-Tetris/blob/master/resource/officialTexture.json", officialTextureSource);
+    let sauce = getJSONFile(" http://localhost/resource/officialTexture.json", "officialTextureSource");
 
     for (let key in TileType) {
         if (TileType[key] == -1)
