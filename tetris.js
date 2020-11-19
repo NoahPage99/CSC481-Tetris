@@ -69,7 +69,6 @@ const Fps = 30;
 const SecondsPerFrame = 1.0 / Fps;
 
 
-
 function setupWebGL() {
 
     // document.onkeydown = handleKey();
@@ -98,62 +97,65 @@ function setupWebGL() {
 
 } // end setupWebGL
 
-function shader(sourceVertex, sourceFragment) {
-    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, 1, sourceVertex, null);
-    gl.compileShader(vertexShader);
+//Shader Archtype
+// shader
+//     |- TileRender
+//     |- GameGridRender
+//     |- TextRender
+//     `- SpriteRender
+class shader {
 
-    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, 1, sourceFragment, null);
-    gl.compileShader(fragmentShader);
+    #id_;
 
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
-        throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);
-        gl.deleteShader(fragmentShader);
-    } else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-        throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
-        gl.deleteShader(vertexShader);
-    } else {
-        var shaderProgram = gl.createProgram();
-        gl.attachShader(shaderProgram, vertexShader);
-        gl.attachShader(shaderProgram, fragmentShader);
-        gl.linkProgram(shaderProgram);
+    constructor(sourceVertex, sourceFragment) {
+        var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, 1, sourceVertex, null);
+        gl.compileShader(vertexShader);
 
-        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
-            throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
-        } else {
-            gl.deleteShader(vertexShader);
+        var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, 1, sourceFragment, null);
+        gl.compileShader(fragmentShader);
+
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { // bad frag shader compile
+            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fragmentShader);
             gl.deleteShader(fragmentShader);
+        } else if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
+            gl.deleteShader(vertexShader);
+        } else {
+            var shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
 
-            id = shaderProgram;
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
+                throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
+            } else {
+                gl.deleteShader(vertexShader);
+                gl.deleteShader(fragmentShader);
+
+                this.#id = shaderProgram;
+            }
         }
+
     }
 
+    use = () => gl.useProgram(this.#id_);
+
+    setFloat = (name, value) => gl.uniform1f(gl.getUniformLocation(id, name), value);
+
+    setMat4 = (name, matrix) => gl.uniformMatrix4fv(gl.getUniformLocation(id, name), 1, gl.FALSE, matrix);
+
+    setVec3 = (name, vec) => gl.uniform3f(gl.getUniformLocation(id, name), vec.x, vec.y, vec.z);
+
+    setVec2 = (name, vec) => gl.uniform2f(gl.getUniformLocation(id, name), vec.x, vec.y);
+
 }
 
-function textureBind() {
-    gl.bindTexture(gl.TEXTURE_2D, id);
-}
-
-function shaderSetFloat(name, value) {
-    gl.uniform1f(gl.getUniformLocation(id, name), value);
-}
-
-function shaderSetMat4(name, matrix) {
-    gl.uniformMatrix4fv(gl.getUniformLocation(id, name), 1, gl.FALSE, matrix);
-}
-
-function shaderSetVec3(name, vec) {
-    gl.uniform3f(gl.getUniformLocation(id, name), vec.x, vec.y, vec.z);
-}
-
-function setVec2(name, vec) {
-    gl.uniform2f(gl.getUniformLocation(id, name), vec.x, vec.y);
-}
-
-function use() {
-    gl.useProgram(id);
-}
+class SpriteRenderer {}
+class TileRenderer {}
+class GameGridRenderer {}
+class TextRenderer {}
 
 function loadRGBTex(path) {
 
@@ -169,10 +171,10 @@ function textures(format, width, height, imag) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 }
 
-//function shaders() {
+// function shaders() {
     // define vertex shader in essl using es6 template strings
 
-    var colorPrimVertexShader = `
+var colorPrimVertexShader = `
 		layout (location = 0) in vec2 position;
 		uniform mat4 projection
 		
@@ -182,7 +184,7 @@ function textures(format, width, height, imag) {
 		}	
 	`
 
-    var colorPrimFragmentShader = `
+var colorPrimFragmentShader = `
 		uniform vec3 inColor;
 		out vec4 color;
 		
@@ -193,7 +195,7 @@ function textures(format, width, height, imag) {
 	
 	`
 
-    var tileVertexShader = `
+var tileVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -209,7 +211,7 @@ function textures(format, width, height, imag) {
 		}
 	`
 
-    var tileFragmentShader = `
+var tileFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -226,7 +228,7 @@ function textures(format, width, height, imag) {
 	
 	`
 
-    var GlyphVertexShader = `
+var GlyphVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -241,7 +243,7 @@ function textures(format, width, height, imag) {
 		}
 	`
 
-    var GlyphFragmentShader = `
+var GlyphFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -256,177 +258,177 @@ function textures(format, width, height, imag) {
 	
 	`
 
-    var white = [1, 1, 1];
-    var black = [0, 0, 0];
+var white = [1, 1, 1];
+var black = [0, 0, 0];
 
-    function spriteRenderer(projection) {
-        var vertices = [0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0];
+function spriteRenderer(projection) {
+    var vertices = [0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0];
 
-        var buffer;
+    var buffer;
 
-        gl.genBuffer(1, buffer);
-        gl.genVertexArrays(1, mainBuffer);
-        gl.bindVertexArray(mainBuffer);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
-        gl.enableVertexAttribArray(1);
-        gl.bindVertexArray(0);
+    gl.genBuffer(1, buffer);
+    gl.genVertexArrays(1, mainBuffer);
+    gl.bindVertexArray(mainBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.enableVertexAttribArray(1);
+    gl.bindVertexArray(0);
 
-        use();
-        shaderSetMat4("projection", projection);
+    use();
+    shaderSetMat4("projection", projection);
 
+}
+
+function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier) {
+    textureBind();
+    use();
+
+    var v = vec2.fromValues(x, y);
+    var v1 = vec2.fromValues(width, height);
+
+    setVec2("shift", v);
+    setVec2("scale", v1);
+
+    shaderSetFloat("mixC", mixC);
+    shaderSetVec3("mixColor", mixColor);
+    shaderSetFloat("alphaMultiplier", alphaMultiplier);
+    gl.bindVertexArray(mainBuffer);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+}
+
+function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow) {
+
+    //unsure on piece.
+
+    if (piece.kind() == NONE) {
+        return;
     }
+    var texture = piece.color();
 
-    function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier) {
-        textureBind();
-        use();
-
-        var v = vec2.fromValues(x, y);
-        var v1 = vec2.fromValues(width, height);
-
-        setVec2("shift", v);
-        setVec2("scale", v1);
-
-        shaderSetFloat("mixC", mixC);
-        shaderSetVec3("mixColor", mixColor);
-        shaderSetFloat("alphaMultiplier", alphaMultiplier);
-        gl.bindVertexArray(mainBuffer);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-    }
-
-    function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow) {
-
-        //unsure on piece.
-
-        if (piece.kind() == NONE) {
-            return;
-        }
-        var texture = piece.color();
-
-        var i = startRow * piece.boxSide();
-        var shape = piece.shape();
-        for (var row = startRow; row < piece.boxSide(); row++) {
-            for (var col = 0; col < piece.boxSide(); col++) {
-                if (shape[i] != empty) {
-                    spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize, mixC, mixColor, alphaMultiplier);
-                    i++;
-                }
+    var i = startRow * piece.boxSide();
+    var shape = piece.shape();
+    for (var row = startRow; row < piece.boxSide(); row++) {
+        for (var col = 0; col < piece.boxSide(); col++) {
+            if (shape[i] != empty) {
+                spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize, mixC, mixColor, alphaMultiplier);
+                i++;
             }
         }
     }
+}
 
-    function pieceRenderInitialShape(piece, x, y) {
+function pieceRenderInitialShape(piece, x, y) {
 
-        //unsure on piece.
+    //unsure on piece.
 
-        if (piece.kind() == NONE) {
-            return;
-        }
-        var texture = piece.color();
+    if (piece.kind() == NONE) {
+        return;
+    }
+    var texture = piece.color();
 
-        var i = 0;
-        var shape = piece.initialShape();
-        for (var row = 0; row < piece.nRow(); row++) {
-            for (var col = 0; col < piece.nCols(); col++) {
-                if (shape[i] != empty) {
-                    spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize);
-                    i++;
-                }
+    var i = 0;
+    var shape = piece.initialShape();
+    for (var row = 0; row < piece.nRow(); row++) {
+        for (var col = 0; col < piece.nCols(); col++) {
+            if (shape[i] != empty) {
+                spriteRender(texture, x + col * tileSize, y + row * tileSize, tileSize, tileSize);
+                i++;
             }
         }
     }
+}
 
-    function renderShapedCentered(piece, x, y, width, height) {
-        var pieceWidth = tileSize * piece.nCols();
-        var pieceHeight = tileSize * piece.nRow();
-        var xShift = .5 * (width - pieceWidth);
-        var yShift = .5 * (height - pieceHeight);
+function renderShapedCentered(piece, x, y, width, height) {
+    var pieceWidth = tileSize * piece.nCols();
+    var pieceHeight = tileSize * piece.nRow();
+    var xShift = .5 * (width - pieceWidth);
+    var yShift = .5 * (height - pieceHeight);
 
-        pieceRenderInitialShape(piece, x + xShift, y + yShift);
+    pieceRenderInitialShape(piece, x + xShift, y + yShift);
+}
+
+var background = vec3.fromValues(.05, .05, .05);
+var gridColor = vec3.fromValues(.2, .2, .2);
+
+function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render) {
+    use();
+    shaderSetMat4("projection", projection);
+
+    var width = rows * tileSize;
+    var height = cols * tileSize;
+
+    var vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
+
+    var yGrid = y;
+
+    for (var row = 0; row < rows + 1; ++row) {
+        vertBack.push(x);
+        vertBack.push(yGrid);
+        vertBack.push(x + width);
+        vertBack.push(yGrid);
+        yGrid += tileSize;
     }
 
-    var background = vec3.fromValues(.05, .05, .05);
-    var gridColor = vec3.fromValues(.2, .2, .2);
+    var xGrid = x;
 
-    function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render) {
-        use();
-        shaderSetMat4("projection", projection);
-
-        var width = rows * tileSize;
-        var height = cols * tileSize;
-
-        var vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
-
-        var yGrid = y;
-
-        for (var row = 0; row < rows + 1; ++row) {
-            vertBack.push(x);
-            vertBack.push(yGrid);
-            vertBack.push(x + width);
-            vertBack.push(yGrid);
-            yGrid += tileSize;
-        }
-
-        var xGrid = x;
-
-        for (var col = 0; col < cols + 1; ++col) {
-            vertBack.push(xGrid);
-            vertBack.push(y);
-            vertBack.push(xGrid);
-            vertBack.push(y + height);
-            xGrid += tileSize;
-        }
-
-        var buffer;
-        gl.genBuffer(1, buffer);
-        gl.genVertexArrays(1, mainBuffer2);
-        gl.bindVertexArray(mainBuffer2);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertback, gl.STATIC_DRAW);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, gl.FLOAT * 2, 0);
-        gl.enableVertexAttribArray(0);
-        gl.bindVertexArray(0);
+    for (var col = 0; col < cols + 1; ++col) {
+        vertBack.push(xGrid);
+        vertBack.push(y);
+        vertBack.push(xGrid);
+        vertBack.push(y + height);
+        xGrid += tileSize;
     }
 
-    function renderBackground() {
-        use();
-        gl.bindVertexArray(mainBuffer2);
-        shaderSetVec3("inColor", backgroundColor);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        shaderSetVec3("inColor", gridColor);
-        gl.drawArrays(gl.LINES, 4, 2 * (nRows_ + nCols_ + 2));
-    }
+    var buffer;
+    gl.genBuffer(1, buffer);
+    gl.genVertexArrays(1, mainBuffer2);
+    gl.bindVertexArray(mainBuffer2);
 
-    function renderTiles(board, alphaMultiplier) {
-        var row;
-        var col;
-        var x;
-        var y;
-        var yy = y_;
-        var xx = x_;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertback, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, gl.FLOAT * 2, 0);
+    gl.enableVertexAttribArray(0);
+    gl.bindVertexArray(0);
+}
 
-        for (var row = 0, y = yy; row < board.nRow; row++, y += tileSize) {
-            for (var col = 0, x = xx; col < board.nCols; col++, x += tileSize) {
-                var tile = board.tileAt(row, col);
-                if (tile == empty) {
-                    continue;
-                }
-                spriteRender(tile, x, y, tileSize, tileSize, 0, 0, alphaMultiplier);
+function renderBackground() {
+    use();
+    gl.bindVertexArray(mainBuffer2);
+    shaderSetVec3("inColor", backgroundColor);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    shaderSetVec3("inColor", gridColor);
+    gl.drawArrays(gl.LINES, 4, 2 * (nRows_ + nCols_ + 2));
+}
+
+function renderTiles(board, alphaMultiplier) {
+    var row;
+    var col;
+    var x;
+    var y;
+    var yy = y_;
+    var xx = x_;
+
+    for (var row = 0, y = yy; row < board.nRow; row++, y += tileSize) {
+        for (var col = 0, x = xx; col < board.nCols; col++, x += tileSize) {
+            var tile = board.tileAt(row, col);
+            if (tile == empty) {
+                continue;
             }
+            spriteRender(tile, x, y, tileSize, tileSize, 0, 0, alphaMultiplier);
         }
-
     }
 
-    function renderPiece(piece, row, col, lock, alphaMultiplier) {
-        var startRow = Math.max(0, -row);
-        var mixC = .5 * Math.sin((Math.PI / 2) * lock);
-        PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
-    }
+}
+
+function renderPiece(piece, row, col, lock, alphaMultiplier) {
+    var startRow = Math.max(0, -row);
+    var mixC = .5 * Math.sin((Math.PI / 2) * lock);
+    PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
+}
 
     function renderGhost(piece, gRow, col)
      {
@@ -434,43 +436,43 @@ function textures(format, width, height, imag) {
 		PieceRenderShape(piece, x_ + col * tileSize, y_ + gRow * tileSize, 0, black, .7, startRow);
 	}
 
-    function clearLinesAnimation(board, percent) {
-        var t = .3;
-        var mixColor;
-        var mixC;
+function clearLinesAnimation(board, percent) {
+    var t = .3;
+    var mixColor;
+    var mixC;
 
-        if (percent < t) {
-            var sin = Math.sin(Math.PI * percent / t);
-            mixColor = white;
-            mixC = .8 * sin;
-        } else {
-            mixColor = black;
-            mixC = (percent - t) / (1 - t);
+    if (percent < t) {
+        var sin = Math.sin(Math.PI * percent / t);
+        mixColor = white;
+        mixC = .8 * sin;
+    } else {
+        mixColor = black;
+        mixC = (percent - t) / (1 - t);
+    }
+    for (var row: board.linesToClear_()
+)
+    {
+        for (var col = 0; col < nCols_; col++) {
+            var x = x_ + col * tileSize;
+            var y = y_ + row * tileSize;
+            spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
         }
-        for (var row: board.linesToClear_()
-    )
-        {
-            for (var col = 0; col < nCols_; col++) {
-                var x = x_ + col * tileSize;
-                var y = y_ + row * tileSize;
-                spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
-            }
-        }
+    }
 
     }
-	
-	
 
 
-    /**  var vShaderCode = `
-     attribute vec3 aVertexPosition; // vertex position
-     attribute vec3 aVertexNormal; // vertex normal
-     attribute vec3 aVertexColor;
-     uniform mat4 umMatrix; // the model matrix
-     uniform mat4 upvmMatrix; // the project view model matrix
-     varying vec3 vWorldPos; // interpolated world position of vertex
-     varying vec3 vVertexNormal; // interpolated normal for frag shader
-     void main(void) {
+
+
+/**  var vShaderCode = `
+ attribute vec3 aVertexPosition; // vertex position
+ attribute vec3 aVertexNormal; // vertex normal
+ attribute vec3 aVertexColor;
+ uniform mat4 umMatrix; // the model matrix
+ uniform mat4 upvmMatrix; // the project view model matrix
+ varying vec3 vWorldPos; // interpolated world position of vertex
+ varying vec3 vVertexNormal; // interpolated normal for frag shader
+ void main(void) {
             
             // vertex position
             vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
@@ -480,26 +482,26 @@ function textures(format, width, height, imag) {
             vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
         }
-     `;
-     // define fragment shader in essl using es6 template strings
-     var fShaderCode = `
-     precision mediump float; // set float to medium precision
-     // eye location
-     uniform vec3 uEyePosition; // the eye's position in world
-     // light properties
-     uniform vec3 uLightAmbient; // the light's ambient color
-     uniform vec3 uLightDiffuse; // the light's diffuse color
-     uniform vec3 uLightSpecular; // the light's specular color
-     uniform vec3 uLightPosition; // the light's position
-     // material properties
-     uniform vec3 uAmbient; // the ambient reflectivity
-     uniform vec3 uDiffuse; // the diffuse reflectivity
-     uniform vec3 uSpecular; // the specular reflectivity
-     uniform float uShininess; // the specular exponent
-     // geometry properties
-     varying vec3 vWorldPos; // world xyz of fragment
-     varying vec3 vVertexNormal; // normal of fragment
-     void main(void) {
+ `;
+ // define fragment shader in essl using es6 template strings
+ var fShaderCode = `
+ precision mediump float; // set float to medium precision
+ // eye location
+ uniform vec3 uEyePosition; // the eye's position in world
+ // light properties
+ uniform vec3 uLightAmbient; // the light's ambient color
+ uniform vec3 uLightDiffuse; // the light's diffuse color
+ uniform vec3 uLightSpecular; // the light's specular color
+ uniform vec3 uLightPosition; // the light's position
+ // material properties
+ uniform vec3 uAmbient; // the ambient reflectivity
+ uniform vec3 uDiffuse; // the diffuse reflectivity
+ uniform vec3 uSpecular; // the specular reflectivity
+ uniform float uShininess; // the specular exponent
+ // geometry properties
+ varying vec3 vWorldPos; // world xyz of fragment
+ varying vec3 vVertexNormal; // normal of fragment
+ void main(void) {
         
             // ambient term
             vec3 ambient = uAmbient*uLightAmbient; 
@@ -520,8 +522,8 @@ function textures(format, width, height, imag) {
             vec3 colorOut = ambient + diffuse + specular; // no specular yet
             gl_FragColor = vec4(colorOut, 1.0); 
         }
-     `;
-     try {
+ `;
+ try {
         // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
         gl.shaderSource(fShader, fShaderCode); // attach code to shader
@@ -1319,6 +1321,53 @@ class Tile {
 
 }
 
+// Reference from
+// https://www.khronos.org/opengl/wiki/Vertex_Specification#Vertex_Array_Object
+class TextRender {
+
+    #font_;
+    #shader_;
+    #vbo_;
+    #vao_; //vertex array object
+
+
+    constructor(projection, font) {
+
+        this.#font_ = font;
+        this.#shader_.use();
+        this.#shader_ = new shader(GlyphVertexShader, GlyphFragmentShader);
+
+        this.#shader_.setMat4("projection", projection);
+
+        this.#vao_ = gl.createVertexArray();
+        this.#vbo_ = gl.createBuffer();
+        gl.bindVertexArray(this.#vao_);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.#vbo_);
+
+        gl.bufferData(gl.ARRAY_BUFFER, 4 * 4 * 4, gl.STATIC_DRAW);
+        //Normalized not effect on gl.FLOAT
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, null, 0);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, null, 2 * 4);
+        gl.enableVertexAttribArray(1);
+
+        gl.bindVertexArray(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    /**
+     *
+     * @param text String
+     * @param x float
+     * @param y float
+     * @param color vec3
+     */
+    render(text, x, y, color) {
+
+    }
+
+}
+
 function twoByTwo() {
     this.pos = [0, 4, 0, 5, 1, 4, 1, 5];
 
@@ -1863,7 +1912,7 @@ function game() {
 
 }
 
-function initialGame(){
+function initialGame() {
     let sauce = getJSONFile(" https://github.ncsu.edu/ncpage/CSC481-Tetris/blob/master/resource/officialTexture.json", officialTextureSource);
 
     for (let key in TileType) {
@@ -1871,30 +1920,43 @@ function initialGame(){
             continue;
         lockedTextures[TileType[key]] = loadTexture(sauce.locked[TileType[key]]);
         ghostTextures[TileType[key]] = loadTexture(sauce.ghost[TileType[key]]);
-        normalTextures[TileType[key]]= loadTexture(sauce.normal[TileType[key]]);
+        normalTextures[TileType[key]] = loadTexture(sauce.normal[TileType[key]]);
     }
 
     grid = new gameGrid(GridNumRows, GridNumCols);
     tetri = new Tetris(grid, GameTimePrecision)
 }
 
-function render(){
+function render() {
+
+    let timeLastGameUpdate = 0;
+    let timeLastRender = 0;
 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.enable(gl.BLEND);
 
-    let projection = mat4.create();
-	
+    //Setup projection
+    let projection = mat4.ortho(0.0, Width, Height, 0.0, -1.0, 1.0);
+    let textRender = new TextRender(projection);
+    let spriteRender = spriteRender(projection);
+
+    let pieceRenderer = pieceRenderer(TileSize, tileTextures, spriteRenderer);
+    PieceRenderer
+    ghostRenderer(kTileSize, ghostTextures, spriteRenderer);
+    BoardRenderer
+    boardRenderer(projection, kTileSize, kBoardX, kBoardY, kBoardNumRows, kBoardNumCols,
+        tileTextures, spriteRenderer, pieceRenderer, ghostRenderer);
+
 	//compute height and weight
 	var letterHeight = computerHeight("A");
-	
+
 	//idk if we need constructors
 	//var spriteRend = spriteRenderer(projection);
-	//var peiceRend - 
-	
+	//var peiceRend -
+
 	var lastUpdate = 0;
 	var lastRender = 0;
-	
+
 	while(document.hasFocus()){
 		if(curGameState == GameState.Run)
 		{
@@ -1915,10 +1977,10 @@ function render(){
 			lastRender = time;
 			gl.clearColor(1, 1, 1, 1);
 			gl.clear(gl.COLOR_BUFFER_BIT);
-			
+
 			renderCentered("NEXT", HudX, HudY, HudWidth, black);
 			renderCentered("HOLD", HudX, HudY + 2, HudPieceBoxHeight, HudWidth, black);
-			
+
 			if(curGameState != GameState.Start)
 			{
 				renderShapedCentered(nextPiece(), HudX, Math.round(HudY + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
@@ -1927,7 +1989,7 @@ function render(){
 			var sco;
 			var lev;
 			var cleared;
-			
+
 			if(curGameState == GameState.Start)
 			{
 				lev = startLevel;
@@ -1940,22 +2002,22 @@ function render(){
 				cleared = linesCleared();
 				sco = score();
 			}
-			
+
 			var y = .6 * Height;
 			renderCentered("LEVEL", HudX, y, HudWidth, black);
 			y += 1.4* letterHeight;
 			renderCentered(toString(lev), HudX, y, HudWidth, black);
-			
+
 			y+=2.5 * letterHeight;
 			renderCentered("LINES", HudX, y, HudWidth, black);
 			y += 1.4* letterHeight;
 			renderCentered(toString(cleared), HudX, y, HudWidth, black);
-			
+
 			y+=2.5 * letterHeight;
 			renderCentered("SCORE", HudX, y, HudWidth, black);
 			y += 1.4* letterHeight;
 			renderCentered(toString(sco), HudX, y, HudWidth, black);
-			
+
 			renderBackground();
 		}
 		switch(curGameState)
@@ -1967,7 +2029,7 @@ function render(){
 				{
 				clearLinesAnimation(board, linesClearPausePercent());
 				}
-				else 
+				else
 				{
 					renderGhost(piece(), ghostRow(), col_);
 					renderPiece(piece(), ghostRow(), col_, lockPercent());
@@ -1978,43 +2040,43 @@ function render(){
 				renderTiles(board, .4);
 				renderPiece(piece(), row_, col_, 0, .4);
 				var y = BoardY + .38 * GridHeight;
-			
+
 				renderCentered("PAUSED", BoardX, y, GridWidth, white);
-			
+
 				y = BoardY + .5 * GridHeight;
-			
+
 				var xName = BoardX +.1 * GridWidth;
 				//var xIcon = BoardX +.9 * GridWidth;
-			
+
 				//var Align = .5 * (Arr
 				textRender("Press Escape To Unpause", xName, y, white);
-			
+
 				y += 5.5 * letterHeight;
-			
+
 				textRender("Press Enter To Go To The Start Screen", xName, y, white);
-			
+
 				break;
 			}
 			case GameState.start:
 			{
 				var y = BoardY + .05 + GridHeight;
-			
+
 				renderCentered("Press Enter To Start", BoardX, y, GridWidth, white);
 				break;
-			
+
 			}
 			case GameState.End:
 			{
 				renderTiles(board, .4);
-			
+
 				var y = BoardY + .05 + GridHeight;
-			
+
 				renderCentered("Press Enter To Continue", BoardX, y, GridWidth, white);
-									
+
 			}
-			
+
 		}
-		
+
 	}
 
 
