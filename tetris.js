@@ -425,11 +425,11 @@ function textures(format, width, height, imag) {
         PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
     }
 
-    /**function renderGhost(piece, gRow, col)
+    function renderGhost(piece, gRow, col)
      {
 		var startRow = Math.max(0, -gRow);
-		
-	}*/
+		PieceRenderShape(piece, x_ + col * tileSize, y_ + gRow * tileSize, 0, black, .7, startRow);
+	}
 
     function clearLinesAnimation(board, percent) {
         var t = .3;
