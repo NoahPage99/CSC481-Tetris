@@ -166,7 +166,7 @@ function textures(format, width, height, imag) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 }
 
-function shaders() {
+//function shaders() {
     // define vertex shader in essl using es6 template strings
 
     var colorPrimVertexShader = `
@@ -455,6 +455,8 @@ function shaders() {
         }
 
     }
+	
+	
 
 
     /**  var vShaderCode = `
@@ -552,7 +554,7 @@ function shaders() {
         console.log(e);
     }*/
 
-}
+//}
 
 // get the JSON file from the passed URL
 function getJSONFile(url, descr) {
@@ -1879,6 +1881,64 @@ function render(){
     gl.enable(gl.BLEND);
 
     let projection = mat4.create();
+	
+	switch(curGameState)
+	{
+		//const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
+		case GameState.Run:
+			renderTiles(board);
+			if(isPausedForLinesClear())
+			{
+				clearLinesAnimation(board, linesClearPausePercent());
+			}
+			else 
+			{
+				renderGhost(piece(), ghostRow(), col_);
+				renderPiece(piece(), ghostRow(), col_, lockPercent());
+			}
+			break;
+		case GameState.Paused:
+		{
+			renderTiles(board, .4);
+			renderPiece(piece(), row_, col_, 0, .4);
+			var y = BoardY + .38 * GridHeight;
+			
+			renderCentered("PAUSED", BoardX, y, GridWidth, white);
+			
+			y = BoardY + .5 * GridHeight;
+			
+			var xName = BoardX +.1 * GridWidth;
+			//var xIcon = BoardX +.9 * GridWidth;
+			
+			//var Align = .5 * (Arr
+			textRender("Press Escape To Unpause", xName, y, white);
+			
+			y += 5.5 * letterHeight;
+			
+			textRender("Press Enter To Go To The Start Screen", xName, y, white);
+			
+			break;
+		case GameState.start:
+		{
+			var y = BoardY + .05 + GridHeight;
+			
+			renderCentered("Press Enter To Start", BoardX, y, GridWidth, white);
+			break;
+			
+		}
+		case GameState.End:
+		{
+			renderTiles(board, .4);
+			
+			var y = BoardY + .05 + GridHeight;
+			
+			renderCentered("Press Enter To Continue", BoardX, y, GridWidth, white);
+									
+		}
+			
+			
+		}
+	}
 
 
 }
