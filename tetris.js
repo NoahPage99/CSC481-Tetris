@@ -105,10 +105,10 @@ function setupWebGL() {
 //     `- SpriteRender
 class shader {
 
-    #id_;
+    #id_ = null;
 
     constructor(sourceVertex, sourceFragment) {
-        var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        let vertexShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vertexShader, 1, sourceVertex, null);
         gl.compileShader(vertexShader);
 
@@ -123,7 +123,7 @@ class shader {
             throw "error during vertex shader compile: " + gl.getShaderInfoLog(vertexShader);
             gl.deleteShader(vertexShader);
         } else {
-            var shaderProgram = gl.createProgram();
+            let shaderProgram = gl.createProgram();
             gl.attachShader(shaderProgram, vertexShader);
             gl.attachShader(shaderProgram, fragmentShader);
             gl.linkProgram(shaderProgram);
@@ -152,29 +152,408 @@ class shader {
 
 }
 
-class SpriteRenderer {}
-class TileRenderer {}
-class GameGridRenderer {}
-class TextRenderer {}
+class SpriteRenderer {
 
-function loadRGBTex(path) {
+    #shader_;
+    #vao_;
 
+    constructor(projection) {
+
+        let vertices =
+            [0.0, 0.0, 0.0, 1.0,
+                0.0, 1.0, 0.0, 0.0,
+                1.0, 0.0, 1.0, 1.0,
+                1.0, 1.0, 1.0, 0.0];
+
+
+        this.#shader_ = new shader(tileVertexShader, tileFragmentShader);
+        this.#vao_ = gl.createVertexArray();
+        let vbo_ = gl.createBuffer();
+        gl.bindVertexArray(this.#vao_);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo_);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices.length, gl.STATIC_DRAW);
+        // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, null, 4 * 4, 0);
+
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, null, 4 * 4, 2 * 4);
+        gl.enableVertexAttribArray(1);
+        gl.bindVertexArray(0);
+
+
+        this.#shader_.use();
+        this.#shader_.setMat4("projection", projection);
+    }
+
+    /**
+     *
+     * @param texture
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @param mixCoeff
+     * @param mixColor
+     * @param alphaMultiplier
+     */
+    render(texture, x, y, width, height, mixCoeff, mixColor, alphaMultiplier) {
+        texture.bind();
+        this.#shader_.use();
+        this.#shader_.setVec2("shift", glm::vec2(x, y));
+        this.#shader_.setVec2("scale", glm::vec2(width, height));
+        this.#shader_.setFloat("mixCoeff", mixCoeff);
+        this.#shader_.setVec3("mixColor", mixColor);
+        this.#shader_.setFloat("alphaMultiplier", alphaMultiplier);
+        gl.bindVertexArray(vao_);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
 }
 
-function textures(format, width, height, imag) {
-    gl.genTextures(1, id);
-    gl.bindTexture(gl.TEXTURE_2D, id);
-    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, gl.UNSIGNED_BYTE, imag);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+class TileRenderer {
+    #tileSize_;
+    #textures_;
+    #spriteRenderer_;
+
+    constructor(tileSize, textures, spriteRenderer) {
+        this.#tileSize_ = tileSize;
+        this.#textures_ = textures;
+        this.#spriteRenderer_ = spriteRenderer;
+    }
+
+
+    renderShape(piece, x, y, mixCoeff = 0, mixColor = Black, alphaMultiplier = 1, startRow = 0) {
+        if (piece.tileType() == TileType.NONE)
+            return;
+
+        let texture = textures_[piece.tileColor()];
+
+        let index = startRow * piece.bBoxSide();
+        let shape = piece.shape();
+        for (let row = startRow; row < piece.bBoxSide(); ++row) {
+            for (let col = 0;
+                 col < piece.bBoxSide();
+                 ++col
+            ) {
+                if (shape[index] != kEmpty)
+                    this.#spriteRenderer_.render(texture, x + col * this.#tileSize_, y + row * this.#tileSize_,
+                        this.#tileSize_, this.#tileSize_, mixCoeff, mixColor, alphaMultiplier);
+
+                ++index;
+            }
+        }
+    }
+
+
+    renderInitialShape(piece, x, y) {
+        if (piece.tileType() == TileType.NONE) {
+            return;
+        }
+        let texture = piece.tileColor();
+
+        let i = 0;
+        let shape = piece.initialShape();
+        for (var row = 0; row < piece.nRow(); row++) {
+            for (var col = 0; col < piece.nCol(); col++) {
+                if (shape[i] != empty) {
+                    spriteRender(texture, x + col * this.#tileSize_, y + row * this.#tileSize_, this.#tileSize_e, this.#tileSize_);
+                    i++;
+                }
+            }
+        }
+    }
+
+    renderInitialShapeCentered(piece, x, y, width, height) {
+        var pieceWidth = this.#tileSize_ * piece.nCol();
+        var pieceHeight = this.#tileSize_ * piece.nRow();
+        var xShift = .5 * (width - pieceWidth);
+        var yShift = .5 * (height - pieceHeight);
+
+        pieceRenderInitialShape(piece, x + xShift, y + yShift);
+    }
+}
+
+class Texture {
+    #id_;
+    width;
+    height;
+
+    constructor(format, width, height, image) {
+        this.width = width;
+        this.height = height;
+
+        this.#id_ = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.#id_);
+        gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, gl.UNSIGNED_BYTE, image);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    }
+
+    bind = () => gl.bindTexture(gl.TEXTURE_2D, this.#id_);
+}
+
+
+class GameGridRenderer {
+    #tileSize_;
+    #x_;
+    #y_;
+    #nRows_
+    #nCols_;
+
+    #tileTextures_;
+
+    #pieceRenderer_
+    #ghostRenderer_;
+    #spriteRenderer_;
+
+    #backgroundShader_;
+    #verticesBackground_;
+    #vaoBackground_;
+
+    constructor(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, ghostRender) {
+
+        this.#tileSize_ = tileSize;
+        this.#tileTextures_ = tileTexture;
+        this.#pieceRenderer_ = pieceRender;
+        this.#ghostRenderer_ = ghostRender;
+        this.#spriteRenderer_ = spriteRender;
+
+        this.#backgroundShader_ = new shader(colorPrimVertexShader, colorPrimFragmentShader);
+
+        this.#backgroundShader_.use();
+        this.#backgroundShader_.setMat4("projection", projection);
+
+        this.#nRows_ = rows;
+        this.#nCols_ = cols;
+
+        const width = rows * tileSize;
+        const height = cols * tileSize;
+
+        let vertBack = [x, y, x, y + height, x + width, y, x + width, y + height];
+
+        let yGrid = y;
+
+        for (let row = 0; row < rows + 1; row++) {
+            vertBack.push(x);
+            vertBack.push(yGrid);
+            vertBack.push(x + width);
+            vertBack.push(yGrid);
+            yGrid += tileSize;
+        }
+
+        let xGrid = x;
+
+        for (let col = 0; col < cols + 1; col++) {
+            vertBack.push(xGrid);
+            vertBack.push(y);
+            vertBack.push(xGrid);
+            vertBack.push(y + height);
+            xGrid += tileSize;
+        }
+
+        let buffer = gl.createBuffer();
+        mainBuffer2 = gl.createVertexArrays();
+        gl.bindVertexArray(mainBuffer2);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertBack.length * gl.FLOAT, vertBack, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, null, gl.FLOAT * 2, 0);
+        gl.enableVertexAttribArray(0);
+        gl.bindVertexArray(0);
+    }
+
+    renderBackground() {
+        this.#backgroundShader_.use();
+        gl.bindVertexArray(mainBuffer2);
+        this.#backgroundShader_.setVec3("inColor", background);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        this.#backgroundShader_.setVec3("inColor", gridColor);
+        gl.drawArrays(gl.LINES, 4, 2 * (this.#nRows_ + this.#nCols_ + 2));
+    }
+
+    renderTiles(grid, alphaMultiplier) {
+        var row;
+        var col;
+        var x;
+        var y;
+        var yy = this.#y_;
+        var xx = this.#x_;
+
+        for (let row = 0, y = yy; row < grid.nRow; row++, y += this.#tileSize_) {
+            for (let col = 0, x = xx; col < grid.nCol(); col++, x += this.#tileSize_) {
+                let tile = grid.tileAt(row, col);
+                if (tile == empty) {
+                    continue;
+                }
+                spriteRender(tile, x, y, this.#tileSize_, this.#tileSize_, 0, 0, alphaMultiplier);
+            }
+        }
+    }
+
+    renderPiece(piece, row, col, lock, alphaMultiplier) {
+        var startRow = Math.max(0, -row);
+        var mixC = .5 * Math.sin((Math.PI / 2) * lock);
+        PieceRenderShape(piece, this.#x_ + col * this.#tileSize_, this.#y_ + row * this.#tileSize_, mixC, Black, alphaMultiplier, startRow);
+    }
+
+    renderGhost(piece, gRow, col) {
+        var startRow = Math.max(0, -gRow);
+        PieceRenderShape(piece, this.#x_ + col * this.#tileSize_, this.#y_ + gRow * this.#tileSize_, 0, Black, .7, startRow);
+    }
+
+    clearLinesAnimation(grid, percent) {
+        const t = .3;
+        let mixColor;
+        let mixC;
+
+        if (percent < t) {
+            let sin = Math.sin(Math.PI * percent / t);
+            mixColor = White;
+            mixC = .8 * sin;
+        } else {
+            mixColor = Black;
+            mixC = (percent - t) / (1 - t);
+        }
+        for (let row in grid.linesToClear()) {
+            for (let col = 0; col < this.#nCols_; col++) {
+                let x = this.#x_ + col * this.#tileSize_;
+                let y = this.#y_ + row * this.#tileSize_;
+                spriteRender(grid.tileAt(row, col), x, y, this.#tileSize_, this.#tileSize_, mixC, mixColor, 1);
+            }
+        }
+
+    }
+}
+
+class TextRender {
+
+    #font_;
+    #shader_;
+    #vbo_;
+    #vao_; //vertex array object
+
+
+    constructor(projection, font) {
+
+        this.#font_ = font;
+        this.#shader_ = new shader(GlyphVertexShader, GlyphFragmentShader);
+        this.#shader_.use();
+        this.#shader_.setMat4("projection", projection);
+
+        this.#vao_ = gl.createVertexArray();
+        this.#vbo_ = gl.createBuffer();
+        gl.bindVertexArray(this.#vao_);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.#vbo_);
+
+        gl.bufferData(gl.ARRAY_BUFFER, 4 * 4 * 4, gl.STATIC_DRAW);
+        //Normalized not effect on gl.FLOAT
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, null, 0);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, null, 2 * 4);
+        gl.enableVertexAttribArray(1);
+
+        gl.bindVertexArray(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    /**
+     *
+     * @param text Texture
+     * @param x float
+     * @param y float
+     * @param color vec3
+     */
+    render(text, x, y, color) {
+        this.#shader_.use();
+        this.#shader_.setVec3("textColor", color);
+        gl.bindVertexArray(this.#vao_);
+
+        x = Math.round(x);
+        y = Math.round(y);
+
+
+        for (let c in text) {
+            let glyph = this.#font_[c];
+
+            let xBbox = x + glyph.bearing.x;
+            let
+                yBbox = y + (this.#font_['A'].bearing.y - glyph.bearing.y);
+
+            let
+                width = glyph.texture.width;
+            let
+                height = glyph.texture.height;
+
+            let vertices = [
+                xBbox, yBbox, 0, 0,
+                xBbox, yBbox + height, 0, 1,
+                xBbox + width, yBbox, 1, 0,
+                xBbox + width, yBbox + height, 1, 1
+            ];
+
+            glyph.texture.bind();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.#vbo_);
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices.length * 4, vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            x += glyph.advance;
+        }
+
+    }
+
+    renderCentered(text, x, y, width,
+                   color) {
+        let textWidth = this.computeWidth(text);
+        let shift = 0.5 * (width - textWidth);
+        render(text, Math.round(x + shift), Math.round(y), color);
+    }
+
+    computeWidth(text) {
+        let width = 0;
+        for (let c in text) {
+            width += this.#font_[c].advance;
+        }
+        width += this.#font_[text.back()].texture.width;
+        return width;
+    }
+
+
+    computeHeight(text) {
+        let height = 0;
+        for (let c in text) {
+            let glyph = this.#font_[c];
+            let textureHeight = glyph.texture.height;
+            height = Math.max(height, this.#font_['H'].bearing.y - glyph.bearing.y + textureHeight);
+        }
+        return height;
+    }
+}
+
+class Glyph {
+    texture;
+    bearing;
+    advance;
+
+    /**
+     *
+     * @param texture Texture
+     * @param bearing vec2
+     * @param advance int
+     */
+    constructor(texture, bearing, advance) {
+        this.advance = advance;
+        this.bearing = bearing;
+        this.texture = texture;
+    }
 }
 
 // function shaders() {
-    // define vertex shader in essl using es6 template strings
+// define vertex shader in essl using es6 template strings
 
-var colorPrimVertexShader = `
+var
+    colorPrimVertexShader = `
 		layout (location = 0) in vec2 position;
 		uniform mat4 projection
 		
@@ -184,7 +563,8 @@ var colorPrimVertexShader = `
 		}	
 	`
 
-var colorPrimFragmentShader = `
+var
+    colorPrimFragmentShader = `
 		uniform vec3 inColor;
 		out vec4 color;
 		
@@ -195,7 +575,8 @@ var colorPrimFragmentShader = `
 	
 	`
 
-var tileVertexShader = `
+var
+    tileVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -211,7 +592,8 @@ var tileVertexShader = `
 		}
 	`
 
-var tileFragmentShader = `
+var
+    tileFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -228,7 +610,8 @@ var tileFragmentShader = `
 	
 	`
 
-var GlyphVertexShader = `
+var
+    GlyphVertexShader = `
 		layout (location = 0) in vec2 position;
 		layout (location = 1) in vec2 texCoord;
 		out vec2 texCoordFragment;
@@ -243,7 +626,8 @@ var GlyphVertexShader = `
 		}
 	`
 
-var GlyphFragmentShader = `
+var
+    GlyphFragmentShader = `
 		in vec2 texCoordFragment;
 		out vec4 color;
 		
@@ -258,10 +642,12 @@ var GlyphFragmentShader = `
 	
 	`
 
-var white = [1, 1, 1];
-var black = [0, 0, 0];
+var White = vec3.fromValues(1, 1, 1);
+var Black = vec3.fromValues(0, 0, 0);
 
-function spriteRenderer(projection) {
+function
+
+spriteRenderer(projection) {
     var vertices = [0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0];
 
     var buffer;
@@ -271,9 +657,9 @@ function spriteRenderer(projection) {
     gl.bindVertexArray(mainBuffer);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, null, 0, 0);
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, null, 0, 0);
     gl.enableVertexAttribArray(1);
     gl.bindVertexArray(0);
 
@@ -282,7 +668,9 @@ function spriteRenderer(projection) {
 
 }
 
-function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier) {
+function
+
+spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultiplier) {
     textureBind();
     use();
 
@@ -300,7 +688,9 @@ function spriteRender(texture, x, y, width, height, mixC, mixColor, alphaMultipl
 
 }
 
-function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow) {
+function
+
+PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow) {
 
     //unsure on piece.
 
@@ -321,7 +711,9 @@ function PieceRenderShape(piece, x, y, mixC, mixColor, alphaMultiplier, startRow
     }
 }
 
-function pieceRenderInitialShape(piece, x, y) {
+function
+
+pieceRenderInitialShape(piece, x, y) {
 
     //unsure on piece.
 
@@ -342,7 +734,9 @@ function pieceRenderInitialShape(piece, x, y) {
     }
 }
 
-function renderShapedCentered(piece, x, y, width, height) {
+function
+
+renderShapedCentered(piece, x, y, width, height) {
     var pieceWidth = tileSize * piece.nCols();
     var pieceHeight = tileSize * piece.nRow();
     var xShift = .5 * (width - pieceWidth);
@@ -351,10 +745,14 @@ function renderShapedCentered(piece, x, y, width, height) {
     pieceRenderInitialShape(piece, x + xShift, y + yShift);
 }
 
-var background = vec3.fromValues(.05, .05, .05);
-var gridColor = vec3.fromValues(.2, .2, .2);
+var
+    background = vec3.fromValues(.05, .05, .05);
+var
+    gridColor = vec3.fromValues(.2, .2, .2);
 
-function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render) {
+function
+
+boardRender(projection, tileSize, x, y, rows, cols, tileTexture, spriteRender, pieceRender, render) {
     use();
     shaderSetMat4("projection", projection);
 
@@ -395,7 +793,9 @@ function boardRender(projection, tileSize, x, y, rows, cols, tileTexture, sprite
     gl.bindVertexArray(0);
 }
 
-function renderBackground() {
+function
+
+renderBackground() {
     use();
     gl.bindVertexArray(mainBuffer2);
     shaderSetVec3("inColor", backgroundColor);
@@ -404,7 +804,9 @@ function renderBackground() {
     gl.drawArrays(gl.LINES, 4, 2 * (nRows_ + nCols_ + 2));
 }
 
-function renderTiles(board, alphaMultiplier) {
+function
+
+renderTiles(board, alphaMultiplier) {
     var row;
     var col;
     var x;
@@ -424,44 +826,47 @@ function renderTiles(board, alphaMultiplier) {
 
 }
 
-function renderPiece(piece, row, col, lock, alphaMultiplier) {
-    var startRow = Math.max(0, -row);
-    var mixC = .5 * Math.sin((Math.PI / 2) * lock);
-    PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
-}
-
-    function renderGhost(piece, gRow, col)
-     {
-		var startRow = Math.max(0, -gRow);
-		PieceRenderShape(piece, x_ + col * tileSize, y_ + gRow * tileSize, 0, black, .7, startRow);
-	}
-
-function clearLinesAnimation(board, percent) {
-    var t = .3;
-    var mixColor;
-    var mixC;
-
-    if (percent < t) {
-        var sin = Math.sin(Math.PI * percent / t);
-        mixColor = white;
-        mixC = .8 * sin;
-    } else {
-        mixColor = black;
-        mixC = (percent - t) / (1 - t);
-    }
-    for (var row: board.linesToClear_()
-)
-    {
-        for (var col = 0; col < nCols_; col++) {
-            var x = x_ + col * tileSize;
-            var y = y_ + row * tileSize;
-            spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
-        }
-    }
-
-    }
-
-
+// function
+//
+// renderPiece(piece, row, col, lock, alphaMultiplier) {
+//     var startRow = Math.max(0, -row);
+//     var mixC = .5 * Math.sin((Math.PI / 2) * lock);
+//     PieceRenderShape(piece, x_ + col * tileSize, y_ + row * tileSize, mixC, black, alphaMultiplier, startRow);
+// }
+//
+// function
+//
+// renderGhost(piece, gRow, col) {
+//     var startRow = Math.max(0, -gRow);
+//     PieceRenderShape(piece, x_ + col * tileSize, y_ + gRow * tileSize, 0, black, .7, startRow);
+// }
+//
+// function
+//
+// clearLinesAnimation(board, percent) {
+//     var t = .3;
+//     var mixColor;
+//     var mixC;
+//
+//     if (percent < t) {
+//         var sin = Math.sin(Math.PI * percent / t);
+//         mixColor = white;
+//         mixC = .8 * sin;
+//     } else {
+//         mixColor = black;
+//         mixC = (percent - t) / (1 - t);
+//     }
+//     for (var row: board.linesToClear_()
+// )
+//     {
+//         for (var col = 0; col < nCols_; col++) {
+//             var x = x_ + col * tileSize;
+//             var y = y_ + row * tileSize;
+//             spriteRender(board.tileAt(row, col), x, y, tileSize, tileSize, mixC, mixColor, 1);
+//         }
+//     }
+//
+// }
 
 
 /**  var vShaderCode = `
@@ -562,7 +967,9 @@ function clearLinesAnimation(board, percent) {
 //}
 
 // get the JSON file from the passed URL
-function getJSONFile(url, descr) {
+function
+
+getJSONFile(url, descr) {
     try {
         if ((typeof (url) !== "string") || (typeof (descr) !== "string"))
             throw "getJSONFile: parameter not a string";
@@ -589,10 +996,11 @@ function getJSONFile(url, descr) {
 } // end get input json file
 
 // From https://gist.github.com/guilhermepontes/17ae0cc71fa2b13ea8c20c94c5c35dc4
-const shuffleArray = arr => arr
-    .map(a => [Math.random(), a])
-    .sort((a, b) => a[0] - b[0])
-    .map(a => a[1]);
+const
+    shuffleArray = arr => arr
+        .map(a => [Math.random(), a])
+        .sort((a, b) => a[0] - b[0])
+        .map(a => a[1]);
 
 
 class gameGrid {
@@ -775,7 +1183,7 @@ class gameGrid {
      * @returns {{}}
      */
 
-    LinesToClear = () => this.#linesToClear_;
+    linesToClear = () => this.#linesToClear_;
 
     /**
      *
@@ -790,6 +1198,7 @@ class gameGrid {
 
     tileCol = () => this.#nCols_;
 
+    tileRow = () => this.#nRows_;
     /**
      *
      * @returns {*}
@@ -1268,7 +1677,7 @@ class Tile {
     const
     nRow = () => this.#nRows_;
     const
-    nCOl = () => this.#nCols_;
+    nCol = () => this.#nCols_;
     const
     bBoxSide = () => this.#bBoxSide_;
     const
@@ -1321,52 +1730,6 @@ class Tile {
 
 }
 
-// Reference from
-// https://www.khronos.org/opengl/wiki/Vertex_Specification#Vertex_Array_Object
-class TextRender {
-
-    #font_;
-    #shader_;
-    #vbo_;
-    #vao_; //vertex array object
-
-
-    constructor(projection, font) {
-
-        this.#font_ = font;
-        this.#shader_.use();
-        this.#shader_ = new shader(GlyphVertexShader, GlyphFragmentShader);
-
-        this.#shader_.setMat4("projection", projection);
-
-        this.#vao_ = gl.createVertexArray();
-        this.#vbo_ = gl.createBuffer();
-        gl.bindVertexArray(this.#vao_);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.#vbo_);
-
-        gl.bufferData(gl.ARRAY_BUFFER, 4 * 4 * 4, gl.STATIC_DRAW);
-        //Normalized not effect on gl.FLOAT
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, null, 0);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(1, 2, gl.FLOAT, null, 2 * 4);
-        gl.enableVertexAttribArray(1);
-
-        gl.bindVertexArray(null);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    }
-
-    /**
-     *
-     * @param text String
-     * @param x float
-     * @param y float
-     * @param color vec3
-     */
-    render(text, x, y, color) {
-
-    }
-
-}
 
 function twoByTwo() {
     this.pos = [0, 4, 0, 5, 1, 4, 1, 5];
@@ -1929,6 +2292,7 @@ function initialGame() {
 
 function render() {
 
+    let y;
     let timeLastGameUpdate = 0;
     let timeLastRender = 0;
 
@@ -1940,144 +2304,127 @@ function render() {
     let textRender = new TextRender(projection);
     let spriteRender = spriteRender(projection);
 
-    let pieceRenderer = pieceRenderer(TileSize, tileTextures, spriteRenderer);
-    PieceRenderer
-    ghostRenderer(kTileSize, ghostTextures, spriteRenderer);
-    BoardRenderer
-    boardRenderer(projection, kTileSize, kBoardX, kBoardY, kBoardNumRows, kBoardNumCols,
-        tileTextures, spriteRenderer, pieceRenderer, ghostRenderer);
+    let pieceRenderer = new TileRenderer(TileSize, normalTextures, spriteRenderer);
 
-	//compute height and weight
-	var letterHeight = computerHeight("A");
+    let ghostRenderer = new TileRenderer(TileSize, ghostTextures, spriteRenderer);
+    let gameGridRenderer = GameGridRenderer(projection, TileSize, BoardX, BoardY, GridNumRows, GridNumCols,
+        normalTextures, spriteRenderer, pieceRenderer, ghostRenderer);
 
-	//idk if we need constructors
-	//var spriteRend = spriteRenderer(projection);
-	//var peiceRend -
+    //compute height and weight
+    let letterHeight = textRender.computeHeight("A");
+    let letterWidth = textRender.computeWidth("A");
+    //idk if we need constructors
+    //var spriteRend = spriteRenderer(projection);
+    //var peiceRend -
 
-	var lastUpdate = 0;
-	var lastRender = 0;
+    var lastUpdate = 0;
+    var lastRender = 0;
 
-	while(document.hasFocus()){
-		if(curGameState == GameState.Run)
-		{
-			var time = d.getMilliseconds();
-			if(time - lastUpdate >= GameTimePrecision)
-			{
-				lastUpdate = time;
-				update(softDrop, moveRight, moveLeft);
-			}
-			if(isGameOver())
-			{
-				curGameState = GameState.End;
-			}
-		}
-		double time = d.getMilliseconds();
-		if(time - lastUpdate >= fps)
-		{
-			lastRender = time;
-			gl.clearColor(1, 1, 1, 1);
-			gl.clear(gl.COLOR_BUFFER_BIT);
+    while (document.hasFocus()) {
+        if (CurGameState == GameState.Run) {
+            let time = d.getMilliseconds();
+            if (time - lastUpdate >= GameTimePrecision) {
+                lastUpdate = time;
+                tetri.update(softDrop, moveRight, moveLeft);
+            }
+            if (tetris.isGameOver()) {
+                CurGameState = GameState.End;
+            }
+        }
+        let time = d.getMilliseconds();
+        if (time - lastUpdate >= fps) {
+            lastRender = time;
+            gl.clearColor(1, 1, 1, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
 
-			renderCentered("NEXT", HudX, HudY, HudWidth, black);
-			renderCentered("HOLD", HudX, HudY + 2, HudPieceBoxHeight, HudWidth, black);
+            textRender.renderCentered("NEXT", HudX, HudY, HudWidth, Black);
+            textRender.renderCentered("HOLD", HudX, HudY + 2, HudPieceBoxHeight, HudWidth, Black);
 
-			if(curGameState != GameState.Start)
-			{
-				renderShapedCentered(nextPiece(), HudX, Math.round(HudY + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
-				renderShapedCentered(heldPiece(), HudX, Math.round(HudY + 2 * HudPieceBoxHeight + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
-			}
-			var sco;
-			var lev;
-			var cleared;
+            if (CurGameState != GameState.Start) {
+                renderShapedCentered(tetri.nextPiece(), HudX, Math.round(HudY + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
+                renderShapedCentered(tetri.heldPiece(), HudX, Math.round(HudY + 2 * HudPieceBoxHeight + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
+            }
+            let sco;
+            let lev;
+            let cleared;
 
-			if(curGameState == GameState.Start)
-			{
-				lev = startLevel;
-				cleared = 0;
-				sco = 0;
-			}
-			else
-			{
-				lev = level();
-				cleared = linesCleared();
-				sco = score();
-			}
+            if (CurGameState == GameState.Start) {
+                lev = startLevel;
+                cleared = 0;
+                sco = 0;
+            } else {
+                lev = tetri.level();
+                cleared = tetri.linesCleared();
+                sco = tetri.score();
+            }
 
-			var y = .6 * Height;
-			renderCentered("LEVEL", HudX, y, HudWidth, black);
-			y += 1.4* letterHeight;
-			renderCentered(toString(lev), HudX, y, HudWidth, black);
+            let y = .6 * Height;
+            textRender.renderCentered("LEVEL", HudX, y, HudWidth, Black);
+            y += 1.4 * letterHeight;
+            textRender.renderCentered(toString(lev), HudX, y, HudWidth, Black);
 
-			y+=2.5 * letterHeight;
-			renderCentered("LINES", HudX, y, HudWidth, black);
-			y += 1.4* letterHeight;
-			renderCentered(toString(cleared), HudX, y, HudWidth, black);
+            y += 2.5 * letterHeight;
+            textRender.renderCentered("LINES", HudX, y, HudWidth, Black);
+            y += 1.4 * letterHeight;
+            textRender.renderCentered(toString(cleared), HudX, y, HudWidth, Black);
 
-			y+=2.5 * letterHeight;
-			renderCentered("SCORE", HudX, y, HudWidth, black);
-			y += 1.4* letterHeight;
-			renderCentered(toString(sco), HudX, y, HudWidth, black);
+            y += 2.5 * letterHeight;
+            textRender.renderCentered("SCORE", HudX, y, HudWidth, Black);
+            y += 1.4 * letterHeight;
+            textRender.renderCentered(toString(sco), HudX, y, HudWidth, Black);
+            textRender.renderBackground();
+        }
+        switch (CurGameState) {
+            //const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
+            case GameState.Run:
+                renderTiles(grid);
+                if (tetri.isPausedForLinesClear()) {
+                    gameGridRenderer.clearLinesAnimation(grid, tetri.linesClearPausePercent());
+                } else {
+                    gameGridRenderer.renderGhost(grid.Tile, grid.ghostRow(), grid.tileCol());
+                    gameGridRenderer.renderPiece(grid.Tile, grid.ghostRow(), grid.tileCol(), tetri.lockPercent());
+                }
+                break;
+            case GameState.Paused: {
+                renderTiles(grid, .4);
+                textRender.renderPiece(grid.Tile, grid.tileRow(), grid.tileCol(), 0, .4);
+                y = BoardY + .38 * GridHeight;
 
-			renderBackground();
-		}
-		switch(curGameState)
-		{
-			//const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
-			case GameState.Run:
-				renderTiles(board);
-				if(isPausedForLinesClear())
-				{
-				clearLinesAnimation(board, linesClearPausePercent());
-				}
-				else
-				{
-					renderGhost(piece(), ghostRow(), col_);
-					renderPiece(piece(), ghostRow(), col_, lockPercent());
-				}
-				break;
-			case GameState.Paused:
-			{
-				renderTiles(board, .4);
-				renderPiece(piece(), row_, col_, 0, .4);
-				var y = BoardY + .38 * GridHeight;
+                textRender.renderCentered("PAUSED", BoardX, y, GridWidth, White);
 
-				renderCentered("PAUSED", BoardX, y, GridWidth, white);
+                y = BoardY + .5 * GridHeight;
 
-				y = BoardY + .5 * GridHeight;
+                let xName = BoardX + .1 * GridWidth;
+                //var xIcon = BoardX +.9 * GridWidth;
 
-				var xName = BoardX +.1 * GridWidth;
-				//var xIcon = BoardX +.9 * GridWidth;
+                //var Align = .5 * (Arr
+                textRender("Press Escape To Unpause", xName, y, White);
 
-				//var Align = .5 * (Arr
-				textRender("Press Escape To Unpause", xName, y, white);
+                y += 5.5 * letterHeight;
 
-				y += 5.5 * letterHeight;
+                textRender("Press Enter To Go To The Start Screen", xName, y, White);
 
-				textRender("Press Enter To Go To The Start Screen", xName, y, white);
+                break;
+            }
+            case GameState.start: {
+                y = BoardY + .05 + GridHeight;
 
-				break;
-			}
-			case GameState.start:
-			{
-				var y = BoardY + .05 + GridHeight;
+                textRender.renderCentered("Press Enter To Start", BoardX, y, GridWidth, White);
+                break;
 
-				renderCentered("Press Enter To Start", BoardX, y, GridWidth, white);
-				break;
+            }
+            case GameState.End: {
+                renderTiles(grid, .4);
 
-			}
-			case GameState.End:
-			{
-				renderTiles(board, .4);
+                y = BoardY + .05 + GridHeight;
 
-				var y = BoardY + .05 + GridHeight;
+                textRender.renderCentered("Press Enter To Continue", BoardX, y, GridWidth, White);
 
-				renderCentered("Press Enter To Continue", BoardX, y, GridWidth, white);
+            }
 
-			}
+        }
 
-		}
-
-	}
+    }
 
 
 }
@@ -2155,8 +2502,8 @@ function main() {
 
     initialGame();
     setupWebGL(); // set up the webGL environment
-    shaders(); //sets up shaders
-    shader();
+    // shaders(); //sets up shaders
+    // shader();
     render();
 
 }
