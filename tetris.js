@@ -25,6 +25,8 @@ var rotating = false;
 var falling = false;
 var mainBuffer;
 var mainBuffer2;
+var d = new Date();
+
 
 //Enumerate
 const TileType = {NONE: -1, I: 0, J: 1, L: 2, O: 3, S: 4, T: 5, Z: 6, GARBAGE: 7};
@@ -65,6 +67,7 @@ let normalTextures = [];
 const GameTimePrecision = 0.005;
 const Fps = 30;
 const SecondsPerFrame = 1.0 / Fps;
+
 
 
 function setupWebGL() {
@@ -1882,62 +1885,136 @@ function render(){
 
     let projection = mat4.create();
 	
-	switch(curGameState)
-	{
-		//const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
-		case GameState.Run:
-			renderTiles(board);
-			if(isPausedForLinesClear())
+	//compute height and weight
+	var letterHeight = computerHeight("A");
+	
+	//idk if we need constructors
+	//var spriteRend = spriteRenderer(projection);
+	//var peiceRend - 
+	
+	var lastUpdate = 0;
+	var lastRender = 0;
+	
+	while(document.hasFocus()){
+		if(curGameState == GameState.Run)
+		{
+			var time = d.getMilliseconds();
+			if(time - lastUpdate >= GameTimePrecision)
 			{
+				lastUpdate = time;
+				update(softDrop, moveRight, moveLeft);
+			}
+			if(isGameOver())
+			{
+				curGameState = GameState.End;
+			}
+		}
+		double time = d.getMilliseconds();
+		if(time - lastUpdate >= fps)
+		{
+			lastRender = time;
+			gl.clearColor(1, 1, 1, 1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+			
+			renderCentered("NEXT", HudX, HudY, HudWidth, black);
+			renderCentered("HOLD", HudX, HudY + 2, HudPieceBoxHeight, HudWidth, black);
+			
+			if(curGameState != GameState.Start)
+			{
+				renderShapedCentered(nextPiece(), HudX, Math.round(HudY + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
+				renderShapedCentered(heldPiece(), HudX, Math.round(HudY + 2 * HudPieceBoxHeight + 1.5 * letterHeight), HudWidth, HudPieceBoxHeight);
+			}
+			var sco;
+			var lev;
+			var cleared;
+			
+			if(curGameState == GameState.Start)
+			{
+				lev = startLevel;
+				cleared = 0;
+				sco = 0;
+			}
+			else
+			{
+				lev = level();
+				cleared = linesCleared();
+				sco = score();
+			}
+			
+			var y = .6 * Height;
+			renderCentered("LEVEL", HudX, y, HudWidth, black);
+			y += 1.4* letterHeight;
+			renderCentered(toString(lev), HudX, y, HudWidth, black);
+			
+			y+=2.5 * letterHeight;
+			renderCentered("LINES", HudX, y, HudWidth, black);
+			y += 1.4* letterHeight;
+			renderCentered(toString(cleared), HudX, y, HudWidth, black);
+			
+			y+=2.5 * letterHeight;
+			renderCentered("SCORE", HudX, y, HudWidth, black);
+			y += 1.4* letterHeight;
+			renderCentered(toString(sco), HudX, y, HudWidth, black);
+			
+			renderBackground();
+		}
+		switch(curGameState)
+		{
+			//const GameState = {Start: 1, Run: 2, Paused: 3, End: 4};
+			case GameState.Run:
+				renderTiles(board);
+				if(isPausedForLinesClear())
+				{
 				clearLinesAnimation(board, linesClearPausePercent());
-			}
-			else 
+				}
+				else 
+				{
+					renderGhost(piece(), ghostRow(), col_);
+					renderPiece(piece(), ghostRow(), col_, lockPercent());
+				}
+				break;
+			case GameState.Paused:
 			{
-				renderGhost(piece(), ghostRow(), col_);
-				renderPiece(piece(), ghostRow(), col_, lockPercent());
+				renderTiles(board, .4);
+				renderPiece(piece(), row_, col_, 0, .4);
+				var y = BoardY + .38 * GridHeight;
+			
+				renderCentered("PAUSED", BoardX, y, GridWidth, white);
+			
+				y = BoardY + .5 * GridHeight;
+			
+				var xName = BoardX +.1 * GridWidth;
+				//var xIcon = BoardX +.9 * GridWidth;
+			
+				//var Align = .5 * (Arr
+				textRender("Press Escape To Unpause", xName, y, white);
+			
+				y += 5.5 * letterHeight;
+			
+				textRender("Press Enter To Go To The Start Screen", xName, y, white);
+			
+				break;
 			}
-			break;
-		case GameState.Paused:
-		{
-			renderTiles(board, .4);
-			renderPiece(piece(), row_, col_, 0, .4);
-			var y = BoardY + .38 * GridHeight;
+			case GameState.start:
+			{
+				var y = BoardY + .05 + GridHeight;
 			
-			renderCentered("PAUSED", BoardX, y, GridWidth, white);
+				renderCentered("Press Enter To Start", BoardX, y, GridWidth, white);
+				break;
 			
-			y = BoardY + .5 * GridHeight;
+			}
+			case GameState.End:
+			{
+				renderTiles(board, .4);
 			
-			var xName = BoardX +.1 * GridWidth;
-			//var xIcon = BoardX +.9 * GridWidth;
+				var y = BoardY + .05 + GridHeight;
 			
-			//var Align = .5 * (Arr
-			textRender("Press Escape To Unpause", xName, y, white);
-			
-			y += 5.5 * letterHeight;
-			
-			textRender("Press Enter To Go To The Start Screen", xName, y, white);
-			
-			break;
-		case GameState.start:
-		{
-			var y = BoardY + .05 + GridHeight;
-			
-			renderCentered("Press Enter To Start", BoardX, y, GridWidth, white);
-			break;
-			
-		}
-		case GameState.End:
-		{
-			renderTiles(board, .4);
-			
-			var y = BoardY + .05 + GridHeight;
-			
-			renderCentered("Press Enter To Continue", BoardX, y, GridWidth, white);
+				renderCentered("Press Enter To Continue", BoardX, y, GridWidth, white);
 									
-		}
+			}
 			
-			
 		}
+		
 	}
 
 
