@@ -3,17 +3,25 @@
   <head>
     <meta charset="UTF-8">
     <title>Tetris</title>
-    
+
     <link type="text/css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet" type="text/css" />
 
 	<script type="text/javascript" src="gl-matrix.js"></script>
-    <script type="text/javascript" src="tetris.js"></script>
-	
-    
+    <script type="text/javascript" src="js.js"></script>
+
+
   </head>
 
-  <body onload="main();">
+  <body>
+    <canvas id="myWebGLCanvas" width="256" height="512">
+    </canvas >
+    <input id="start" type="button" value="start" onclick="startgame();" />
+
+    <div   id="tage"  >
+        <h3>Score:</h3>
+    </div>
+    <div  id="scores"></div>
     <canvas id="myImageCanvas" width="512" height="512"></canvas>
-    <canvas id="myWebGLCanvas" width="512" height="512"></canvas> 
   </body>
 </html>
